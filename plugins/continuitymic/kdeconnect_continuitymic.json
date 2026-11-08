@@ -10,7 +10,6 @@
         "Description[es]": "Usa tu teléfono o dispositivo remoto como micrófono virtual de alta fidelidad vía PipeWire y EasyEffects",
         "EnabledByDefault": true,
         "Icon": "audio-input-microphone",
-        "Id": "kdeconnect_continuitymic",
         "Name": "Continuity Microphone (PipeWire)",
         "Name[es]": "Micrófono de Continuidad (PipeWire)",
         "ServiceTypes": [

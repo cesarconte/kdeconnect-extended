@@ -10,7 +10,6 @@
         "Description[es]": "Usa la cámara de tu smartphone o tablet como cámara web de alta definición vía PipeWire en KDE Plasma 6",
         "EnabledByDefault": true,
         "Icon": "camera-web",
-        "Id": "kdeconnect_continuitycamera",
         "Name": "Continuity Camera (PipeWire)",
         "Name[es]": "Cámara de Continuidad (PipeWire)",
         "ServiceTypes": [

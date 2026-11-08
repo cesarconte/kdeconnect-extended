@@ -10,7 +10,6 @@
         "Description[es]": "Continúa navegando por la web y tareas activas desde tu teléfono o tablet en tu escritorio KDE Plasma",
         "EnabledByDefault": true,
         "Icon": "preferences-desktop-activities",
-        "Id": "kdeconnect_handoff",
         "Name": "KDE Connect Handoff (Continuity)",
         "Name[es]": "KDE Connect Handoff (Continuidad)",
         "ServiceTypes": [
