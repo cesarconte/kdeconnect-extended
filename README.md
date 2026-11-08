@@ -4,6 +4,7 @@ KDE Connect Extended brings next-generation continuity features to Linux and KDE
 
 ## ✨ Next-Gen Continuity Features (Extended Suite)
 - 🎯 **KDE Connect Radar:** Kirigami-powered concentric proximity radar with fluid animations, device discovery, and native Drag-and-Drop sharing straight to remote peer avatars.
+- 🔄 **Task & Web Handoff:** Seamlessly resume browsing sessions or active tasks from paired devices on desktop with one-click interactive banner suggestions.
 - 🎙️ **Continuity Microphone (Native PipeWire SPA):** Stream remote smartphone audio directly into Linux as a virtual microphone node (`kdeconnect.continuity_mic`) automatically recognized by WirePlumber and processed through EasyEffects DSP chains.
 - 📋 **Universal Clipboard with TTL Expiration:** 2-minute expiration (TTL = 120s) for synced clips, auto-purging sensitive passwords and avoiding stale clipboard leaks.
 - 🐬 **Dolphin Deep Integration:** Contextual right-click "Compartir vía KDE Connect" directly from Dolphin file manager.

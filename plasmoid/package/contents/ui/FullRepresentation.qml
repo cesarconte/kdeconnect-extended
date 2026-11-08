@@ -55,33 +55,45 @@ PlasmaExtras.Representation {
         }
     }
 
-    Item {
+    ColumnLayout {
         anchors.fill: parent
+        spacing: Kirigami.Units.smallSpacing
 
-        DeviceRadar {
-            anchors.fill: parent
-            visible: kdeconnect.isRadarView
-            devicesModel: pairedDevicesModel
+        HandoffBanner {
+            id: handoffBanner
+            Layout.fillWidth: true
+            Layout.margins: Kirigami.Units.smallSpacing
+            visible: hasActivity
         }
 
-        PlasmaComponents3.ScrollView {
-            anchors.fill: parent
-            visible: !kdeconnect.isRadarView
-            contentWidth: availableWidth
-            
-            // Prevent horizontal scrollbar from appearing when vertical scrollbar shows/hides
-            QQC2.ScrollBar.horizontal.policy: QQC2.ScrollBar.AlwaysOff
+        Item {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
 
-            contentItem: ListView {
-                id: devicesView
+            DeviceRadar {
+                anchors.fill: parent
+                visible: kdeconnect.isRadarView
+                devicesModel: pairedDevicesModel
+            }
 
-                clip: true
+            PlasmaComponents3.ScrollView {
+                anchors.fill: parent
+                visible: !kdeconnect.isRadarView
+                contentWidth: availableWidth
+                
+                // Prevent horizontal scrollbar from appearing when vertical scrollbar shows/hides
+                QQC2.ScrollBar.horizontal.policy: QQC2.ScrollBar.AlwaysOff
 
-                Layout.margins: 0
+                contentItem: ListView {
+                    id: devicesView
 
-                delegate: DeviceDelegate {
-                    width: ListView.view.width - ListView.view.leftMargin - ListView.view.rightMargin
-                }
+                    clip: true
+
+                    Layout.margins: 0
+
+                    delegate: DeviceDelegate {
+                        width: ListView.view.width - ListView.view.leftMargin - ListView.view.rightMargin
+                    }
 
                 PlasmaExtras.PlaceholderMessage {
                     width: parent.width
@@ -132,4 +144,5 @@ PlasmaExtras.Representation {
             }
         }
     }
+}
 }

@@ -1,0 +1,29 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "yugurta@gmail.com",
+                "Name": "Cesar"
+            }
+        ],
+        "Description": "Seamlessly resume web browsing and active tasks from your phone or tablet on your KDE Plasma desktop",
+        "Description[es]": "Continúa navegando por la web y tareas activas desde tu teléfono o tablet en tu escritorio KDE Plasma",
+        "EnabledByDefault": true,
+        "Icon": "preferences-desktop-activities",
+        "Id": "kdeconnect_handoff",
+        "Name": "KDE Connect Handoff (Continuity)",
+        "Name[es]": "KDE Connect Handoff (Continuidad)",
+        "ServiceTypes": [
+            "KdeConnect/Plugin"
+        ],
+        "Version": "1.0"
+    },
+    "X-KdeConnect-OutgoingPacketType": [
+        "kdeconnect.handoff.activity",
+        "kdeconnect.handoff.request"
+    ],
+    "X-KdeConnect-SupportedPacketType": [
+        "kdeconnect.handoff.activity",
+        "kdeconnect.handoff.clear"
+    ]
+}
