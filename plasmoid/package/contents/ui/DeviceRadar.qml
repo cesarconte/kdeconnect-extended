@@ -46,14 +46,17 @@ ColumnLayout {
         }
     }
 
-    // Subtítulo explicativo
+    // Subtítulo explicativo con respuesta dinámica al arrastrar archivos
     PlasmaComponents3.Label {
         Layout.fillWidth: true
         Layout.topMargin: Kirigami.Units.smallSpacing
         horizontalAlignment: Text.AlignHCenter
-        text: i18n("Arrastra y suelta un archivo sobre cualquier dispositivo para compartirlo al instante.")
+        text: radarDropArea.containsDrag 
+            ? i18n("¡Suelta el archivo sobre un dispositivo para transferirlo!") 
+            : i18n("Arrastra y suelta un archivo sobre cualquier dispositivo para compartirlo.")
         font.pointSize: Kirigami.Theme.smallFont.pointSize
-        color: Kirigami.Theme.disabledTextColor
+        font.bold: radarDropArea.containsDrag
+        color: radarDropArea.containsDrag ? Kirigami.Theme.highlightColor : Kirigami.Theme.disabledTextColor
         wrapMode: Text.WordWrap
     }
 
@@ -69,6 +72,36 @@ ColumnLayout {
         readonly property real centerY: height / 2
         readonly property real maxRadius: Math.max(Kirigami.Units.gridUnit * 4, Math.min(width, height) / 2 - Kirigami.Units.gridUnit * 1.5)
 
+        // DropArea global para todo el radar: garantiza que el cursor NUNCA muestre "acción no permitida"
+        DropArea {
+            id: radarDropArea
+            anchors.fill: parent
+            z: 1
+            keys: ["text/uri-list", "text/plain"]
+
+            onEntered: drag => {
+                drag.acceptProposedAction();
+            }
+
+            onPositionChanged: drag => {
+                drag.acceptProposedAction();
+            }
+
+            onDropped: drop => {
+                if (drop.hasUrls && devicesRepeater.count > 0) {
+                    // Si se suelta en cualquier parte del radar, enviar al primer dispositivo activo
+                    const targetNode = devicesRepeater.itemAt(0);
+                    if (targetNode && targetNode.sharePlugin) {
+                        const urls = new Set(drop.urls.map(url => url.toString()));
+                        urls.forEach(url => targetNode.sharePlugin.shareUrl(url));
+                        drop.accepted = true;
+                        return;
+                    }
+                }
+                drop.accepted = false;
+            }
+        }
+
         // Ondas concéntricas animadas
         Repeater {
             model: 3
@@ -82,7 +115,7 @@ ColumnLayout {
                 radius: width / 2
                 color: "transparent"
                 border.color: Kirigami.Theme.highlightColor
-                border.width: 1.5
+                border.width: radarDropArea.containsDrag ? 2.5 : 1.5
                 opacity: 0.5
 
                 SequentialAnimation {
@@ -90,7 +123,7 @@ ColumnLayout {
                     loops: Animation.Infinite
 
                     PauseAnimation {
-                        duration: ring.index * 1200
+                        duration: ring.index * (radarDropArea.containsDrag ? 700 : 1200)
                     }
 
                     ParallelAnimation {
@@ -99,15 +132,15 @@ ColumnLayout {
                             property: "width"
                             from: 40
                             to: radarArea.maxRadius * 2
-                            duration: 3600
+                            duration: radarDropArea.containsDrag ? 2000 : 3600
                             easing.type: Easing.OutCubic
                         }
                         NumberAnimation {
                             target: ring
                             property: "opacity"
-                            from: 0.6
+                            from: 0.7
                             to: 0.0
-                            duration: 3600
+                            duration: radarDropArea.containsDrag ? 2000 : 3600
                             easing.type: Easing.OutQuad
                         }
                     }
@@ -194,14 +227,15 @@ ColumnLayout {
 
                 width: Kirigami.Units.gridUnit * 5
                 height: Kirigami.Units.gridUnit * 5.5
+                z: 20
 
-                readonly property string devId: model.Id ?? ""
-                readonly property string devName: model.Name ?? i18n("Dispositivo")
-                readonly property string devIcon: model.IconName ?? "smartphone"
-                readonly property bool isReachable: model.IsReachable ?? true
+                readonly property string devId: model.deviceId ?? ""
+                readonly property string devName: model.name ?? i18n("Dispositivo")
+                readonly property string devIcon: model.iconName ?? "smartphone"
+                readonly property bool isReachable: (model.device && model.device.isReachable) ?? true
 
                 // Plugin Share asociado
-                property KDEConnect.ShareDbusInterface sharePlugin: KDEConnect.ShareDbusInterfaceFactory.create(devId)
+                property KDEConnect.ShareDbusInterface sharePlugin: devId ? KDEConnect.ShareDbusInterfaceFactory.create(devId) : null
 
                 QtDialogs.FileDialog {
                     id: deviceFileDialog
@@ -216,21 +250,28 @@ ColumnLayout {
                     }
                 }
 
-                // Zona de Drag & Drop por dispositivo
+                // Zona de Drag & Drop específica para este dispositivo con prioridad Z
                 DropArea {
                     id: nodeDropArea
                     anchors.fill: parent
+                    z: 50
+                    keys: ["text/uri-list", "text/plain"]
 
-                    onEntered: {
-                        avatarCircle.scale = 1.2
+                    onEntered: drag => {
+                        avatarCircle.scale = 1.25;
+                        drag.acceptProposedAction();
+                    }
+
+                    onPositionChanged: drag => {
+                        drag.acceptProposedAction();
                     }
 
                     onExited: {
-                        avatarCircle.scale = 1.0
+                        avatarCircle.scale = 1.0;
                     }
 
                     onDropped: drop => {
-                        avatarCircle.scale = 1.0
+                        avatarCircle.scale = 1.0;
                         if (drop.hasUrls && deviceNode.sharePlugin) {
                             const urls = new Set(drop.urls.map(url => url.toString()));
                             urls.forEach(url => deviceNode.sharePlugin.shareUrl(url));
@@ -242,6 +283,7 @@ ColumnLayout {
                 ColumnLayout {
                     anchors.fill: parent
                     spacing: 2
+                    z: 10
 
                     Rectangle {
                         id: avatarCircle
@@ -300,6 +342,7 @@ ColumnLayout {
                         horizontalAlignment: Text.AlignHCenter
                         text: nodeDropArea.containsDrag ? i18n("¡Soltar aquí!") : (deviceNode.isReachable ? i18n("Conectado") : i18n("Fuera de alcance"))
                         font.pointSize: Math.max(7, Kirigami.Theme.smallFont.pointSize - 2)
+                        font.bold: nodeDropArea.containsDrag
                         color: nodeDropArea.containsDrag ? Kirigami.Theme.highlightColor : Kirigami.Theme.disabledTextColor
                     }
                 }
