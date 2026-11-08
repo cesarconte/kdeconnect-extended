@@ -43,12 +43,13 @@ Rectangle {
         id: handoffWatchers
         model: root.devicesModel
 
-        delegate: QtObject {
+        delegate: Item {
             id: watcher
+            visible: false
             required property string deviceId
             required property string name
 
-            readonly property KDEConnect.HandoffDbusInterface handoffIface: KDEConnect.HandoffDbusInterfaceFactory.create(deviceId)
+            property KDEConnect.HandoffDbusInterface handoffIface: KDEConnect.HandoffDbusInterfaceFactory.create(deviceId)
 
             Component.onCompleted: {
                 root.updateActiveActivity();
