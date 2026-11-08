@@ -1,12 +1,12 @@
-# KDE Connect Extended (Plasma Drop & Apple Continuity Suite)
+# KDE Connect Extended (Continuity & Proximity Suite)
 
-KDE Connect Extended brings macOS Golden Gate / Apple Continuity features to Linux and KDE Plasma 6 (Wayland native), built specifically with Qt6, KF6, and PipeWire integration.
+KDE Connect Extended brings next-generation continuity features to Linux and KDE Plasma 6 (Wayland native), built specifically with Qt6, KF6, and PipeWire integration.
 
 ## ✨ Next-Gen Continuity Features (Extended Suite)
-- 🎯 **Plasma Drop Radar (AirDrop-style UI):** Kirigami-powered concentric proximity radar with fluid animations, device discovery, and native Drag-and-Drop sharing straight to remote peer avatars.
+- 🎯 **KDE Connect Radar:** Kirigami-powered concentric proximity radar with fluid animations, device discovery, and native Drag-and-Drop sharing straight to remote peer avatars.
 - 🎙️ **Continuity Microphone (Native PipeWire SPA):** Stream remote smartphone audio directly into Linux as a virtual microphone node (`kdeconnect.continuity_mic`) automatically recognized by WirePlumber and processed through EasyEffects DSP chains.
-- 📋 **Universal Clipboard with TTL Expiration:** macOS Continuity-standard 2-minute expiration (TTL = 120s) for synced clips, auto-purging sensitive passwords and avoiding stale clipboard leaks.
-- 🐬 **Dolphin Deep Integration:** Contextual right-click "Compartir vía Plasma Drop (AirDrop)" directly from Dolphin file manager.
+- 📋 **Universal Clipboard with TTL Expiration:** 2-minute expiration (TTL = 120s) for synced clips, auto-purging sensitive passwords and avoiding stale clipboard leaks.
+- 🐬 **Dolphin Deep Integration:** Contextual right-click "Compartir vía KDE Connect" directly from Dolphin file manager.
 - 🔒 **Wayland-first Architecture:** Full compatibility with Plasma 6.8 Wayland session, zero legacy X11 or ALSA/PulseAudio dependencies.
 
 ## (Standard) Features

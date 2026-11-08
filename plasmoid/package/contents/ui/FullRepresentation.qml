@@ -38,7 +38,7 @@ PlasmaExtras.Representation {
         spacing: Kirigami.Units.smallSpacing
 
         PlasmaComponents3.Label {
-            text: kdeconnect.isRadarView ? i18n("AirDrop Radar") : i18n("Dispositivos")
+            text: kdeconnect.isRadarView ? i18n("Radar de KDE Connect") : i18n("Dispositivos")
             font.bold: true
             Layout.leftMargin: Kirigami.Units.smallSpacing
             Layout.fillWidth: true
@@ -49,7 +49,7 @@ PlasmaExtras.Representation {
             text: kdeconnect.isRadarView ? i18n("Ver lista") : i18n("Ver radar")
             display: PlasmaComponents3.AbstractButton.IconOnly
             PlasmaComponents3.ToolTip {
-                text: kdeconnect.isRadarView ? i18n("Cambiar a vista de lista") : i18n("Cambiar a vista de radar AirDrop")
+                text: kdeconnect.isRadarView ? i18n("Cambiar a vista de lista") : i18n("Cambiar a vista de radar")
             }
             onClicked: kdeconnect.isRadarView = !kdeconnect.isRadarView
         }
@@ -58,7 +58,7 @@ PlasmaExtras.Representation {
     Item {
         anchors.fill: parent
 
-        AirDropRadar {
+        DeviceRadar {
             anchors.fill: parent
             visible: kdeconnect.isRadarView
             devicesModel: pairedDevicesModel

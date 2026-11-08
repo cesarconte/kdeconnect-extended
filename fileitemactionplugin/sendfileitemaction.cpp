@@ -32,7 +32,7 @@ QList<QAction *> SendFileItemAction::actions(const KFileItemListProperties &file
 {
     // We have to return an action right away.
     // Return a placeholder that we then asynchronously populate.
-    auto *action = new QAction(QIcon::fromTheme(QStringLiteral("network-wireless")), i18n("Compartir vía Plasma Drop (AirDrop)"), parentWidget);
+    auto *action = new QAction(QIcon::fromTheme(QStringLiteral("kdeconnect")), i18n("Compartir vía KDE Connect"), parentWidget);
     action->setVisible(false);
 
     auto *job = new DeviceActionJob(fileItemInfos.urlList(), parentWidget);
@@ -44,7 +44,7 @@ QList<QAction *> SendFileItemAction::actions(const KFileItemListProperties &file
             action->setVisible(true);
         } else if (actions.count() == 1) {
             auto *firstAction = actions.first();
-            action->setText(i18n("Compartir con '%1' vía Plasma Drop", firstAction->text()));
+            action->setText(i18n("Compartir con '%1' vía KDE Connect", firstAction->text()));
             action->setIcon(firstAction->icon());
             connect(action, &QAction::triggered, firstAction, &QAction::trigger);
             action->setVisible(true);

@@ -24,7 +24,7 @@ Item {
     implicitWidth: Kirigami.Units.gridUnit * 22
     implicitHeight: Kirigami.Units.gridUnit * 24
 
-    // Configuración de visibilidad (Modo AirDrop)
+    // Configuración de visibilidad de proximidad
     // 0 = Nadie, 1 = Sólo conocidos, 2 = Todos (10 min)
     property int visibilityMode: 1
     property int countdownSeconds: 600
@@ -63,7 +63,7 @@ Item {
             }
 
             PlasmaComponents3.Label {
-                text: i18n("Plasma Drop Radar")
+                text: i18n("Radar de KDE Connect")
                 font.bold: true
                 font.pointSize: Kirigami.Theme.defaultFont.pointSize + 1
             }
@@ -350,7 +350,7 @@ Item {
         }
     }
 
-    // Controles inferiores: Selector de Visibilidad tipo AirDrop
+    // Controles inferiores: Selector de Visibilidad de proximidad
     ColumnLayout {
         id: controlsLayout
         anchors.bottom: parent.bottom
@@ -360,7 +360,7 @@ Item {
         spacing: Kirigami.Units.smallSpacing
 
         PlasmaComponents3.Label {
-            text: i18n("Visibilidad de Plasma Drop:")
+            text: i18n("Visibilidad de KDE Connect:")
             font.bold: true
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             Layout.alignment: Qt.AlignHCenter
