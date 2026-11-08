@@ -8,7 +8,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls as QQC2
 import QtQuick.Layouts
-import QtQuick.Dialogs as QtDialogs
 import QtCore
 
 import org.kde.kdeconnect as KDEConnect
@@ -52,8 +51,8 @@ ColumnLayout {
         Layout.topMargin: Kirigami.Units.smallSpacing
         horizontalAlignment: Text.AlignHCenter
         text: radarDropArea.containsDrag 
-            ? i18n("¡Suelta el archivo sobre un dispositivo para transferirlo!") 
-            : i18n("Arrastra y suelta un archivo sobre cualquier dispositivo para compartirlo.")
+            ? i18n("¡Suelta el archivo para enviarlo al dispositivo!") 
+            : i18n("Arrastra y suelta un archivo desde Dolphin o tu escritorio aquí.")
         font.pointSize: Kirigami.Theme.smallFont.pointSize
         font.bold: radarDropArea.containsDrag
         color: radarDropArea.containsDrag ? Kirigami.Theme.highlightColor : Kirigami.Theme.disabledTextColor
@@ -72,12 +71,11 @@ ColumnLayout {
         readonly property real centerY: height / 2
         readonly property real maxRadius: Math.max(Kirigami.Units.gridUnit * 4, Math.min(width, height) / 2 - Kirigami.Units.gridUnit * 1.5)
 
-        // DropArea global para todo el radar: garantiza que el cursor NUNCA muestre "acción no permitida"
+        // DropArea global para todo el radar (sin filtro keys para aceptar arrastres nativos de Dolphin y Wayland)
         DropArea {
             id: radarDropArea
             anchors.fill: parent
             z: 1
-            keys: ["text/uri-list", "text/plain"]
 
             onEntered: drag => {
                 drag.acceptProposedAction();
@@ -89,11 +87,12 @@ ColumnLayout {
 
             onDropped: drop => {
                 if (drop.hasUrls && devicesRepeater.count > 0) {
-                    // Si se suelta en cualquier parte del radar, enviar al primer dispositivo activo
                     const targetNode = devicesRepeater.itemAt(0);
                     if (targetNode && targetNode.sharePlugin) {
-                        const urls = new Set(drop.urls.map(url => url.toString()));
-                        urls.forEach(url => targetNode.sharePlugin.shareUrl(url));
+                        const urls = Array.from(new Set(drop.urls.map(url => url.toString())));
+                        targetNode.sharePlugin.shareUrls(urls);
+                        targetNode.notifySent();
+                        drop.acceptProposedAction();
                         drop.accepted = true;
                         return;
                     }
@@ -234,28 +233,27 @@ ColumnLayout {
                 readonly property string devIcon: model.iconName ?? "smartphone"
                 readonly property bool isReachable: (model.device && model.device.isReachable) ?? true
 
+                property bool justSent: false
+
+                Timer {
+                    id: sentTimer
+                    interval: 2200
+                    onTriggered: deviceNode.justSent = false
+                }
+
+                function notifySent() {
+                    deviceNode.justSent = true;
+                    sentTimer.restart();
+                }
+
                 // Plugin Share asociado
                 property KDEConnect.ShareDbusInterface sharePlugin: devId ? KDEConnect.ShareDbusInterfaceFactory.create(devId) : null
 
-                QtDialogs.FileDialog {
-                    id: deviceFileDialog
-                    title: i18n("Enviar a %1", deviceNode.devName)
-                    currentFolder: StandardPaths.standardLocations(StandardPaths.HomeLocation)[0]
-                    modality: Qt.NonModal
-                    fileMode: QtDialogs.FileDialog.OpenFiles
-                    onAccepted: {
-                        if (deviceNode.sharePlugin) {
-                            deviceNode.sharePlugin.shareUrls(selectedFiles);
-                        }
-                    }
-                }
-
-                // Zona de Drag & Drop específica para este dispositivo con prioridad Z
+                // Zona de Drag & Drop por dispositivo
                 DropArea {
                     id: nodeDropArea
                     anchors.fill: parent
                     z: 50
-                    keys: ["text/uri-list", "text/plain"]
 
                     onEntered: drag => {
                         avatarCircle.scale = 1.25;
@@ -273,8 +271,10 @@ ColumnLayout {
                     onDropped: drop => {
                         avatarCircle.scale = 1.0;
                         if (drop.hasUrls && deviceNode.sharePlugin) {
-                            const urls = new Set(drop.urls.map(url => url.toString()));
-                            urls.forEach(url => deviceNode.sharePlugin.shareUrl(url));
+                            const urls = Array.from(new Set(drop.urls.map(url => url.toString())));
+                            deviceNode.sharePlugin.shareUrls(urls);
+                            deviceNode.notifySent();
+                            drop.acceptProposedAction();
                             drop.accepted = true;
                         }
                     }
@@ -291,8 +291,12 @@ ColumnLayout {
                         width: Kirigami.Units.iconSizes.large + 6
                         height: width
                         radius: width / 2
-                        color: nodeDropArea.containsDrag ? Kirigami.Theme.highlightColor : Kirigami.Theme.cardBackgroundColor
-                        border.color: nodeDropArea.containsDrag ? Kirigami.Theme.highlightColor : (deviceNode.isReachable ? Kirigami.Theme.highlightColor : Kirigami.Theme.disabledTextColor)
+                        color: nodeDropArea.containsDrag 
+                            ? Kirigami.Theme.highlightColor 
+                            : (deviceNode.justSent ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.cardBackgroundColor)
+                        border.color: nodeDropArea.containsDrag 
+                            ? Kirigami.Theme.highlightColor 
+                            : (deviceNode.isReachable ? Kirigami.Theme.highlightColor : Kirigami.Theme.disabledTextColor)
                         border.width: nodeDropArea.containsDrag ? 3 : 1.5
 
                         Behavior on scale {
@@ -301,10 +305,10 @@ ColumnLayout {
 
                         Kirigami.Icon {
                             anchors.centerIn: parent
-                            source: deviceNode.devIcon
+                            source: deviceNode.justSent ? "dialog-ok" : deviceNode.devIcon
                             implicitWidth: Kirigami.Units.iconSizes.medium
                             implicitHeight: Kirigami.Units.iconSizes.medium
-                            color: nodeDropArea.containsDrag ? Kirigami.Theme.highlightedTextColor : Kirigami.Theme.textColor
+                            color: (nodeDropArea.containsDrag || deviceNode.justSent) ? Kirigami.Theme.highlightedTextColor : Kirigami.Theme.textColor
                         }
 
                         // Indicador de conexión
@@ -317,14 +321,6 @@ ColumnLayout {
                             color: deviceNode.isReachable ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.neutralTextColor
                             border.color: Kirigami.Theme.backgroundColor
                             border.width: 1
-                        }
-
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                deviceFileDialog.open()
-                            }
                         }
                     }
 
@@ -340,10 +336,14 @@ ColumnLayout {
                     PlasmaComponents3.Label {
                         Layout.fillWidth: true
                         horizontalAlignment: Text.AlignHCenter
-                        text: nodeDropArea.containsDrag ? i18n("¡Soltar aquí!") : (deviceNode.isReachable ? i18n("Conectado") : i18n("Fuera de alcance"))
+                        text: deviceNode.justSent
+                            ? i18n("¡Enviado!")
+                            : (nodeDropArea.containsDrag ? i18n("¡Soltar aquí!") : (deviceNode.isReachable ? i18n("Conectado") : i18n("Fuera de alcance")))
                         font.pointSize: Math.max(7, Kirigami.Theme.smallFont.pointSize - 2)
-                        font.bold: nodeDropArea.containsDrag
-                        color: nodeDropArea.containsDrag ? Kirigami.Theme.highlightColor : Kirigami.Theme.disabledTextColor
+                        font.bold: nodeDropArea.containsDrag || deviceNode.justSent
+                        color: deviceNode.justSent 
+                            ? Kirigami.Theme.positiveTextColor 
+                            : (nodeDropArea.containsDrag ? Kirigami.Theme.highlightColor : Kirigami.Theme.disabledTextColor)
                     }
                 }
             }
