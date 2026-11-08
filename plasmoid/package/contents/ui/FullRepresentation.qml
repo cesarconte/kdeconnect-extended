@@ -21,6 +21,7 @@ PlasmaExtras.Representation {
     id: kdeconnect
 
     property alias devicesModel: devicesView.model
+    property bool isRadarView: true
 
     collapseMarginsHint: true
 
@@ -33,68 +34,100 @@ PlasmaExtras.Representation {
         displayFilter: KDEConnect.DevicesModel.Paired
     }
 
-    PlasmaComponents3.ScrollView {
-        anchors.fill: parent
-        contentWidth: availableWidth
-        
-        // Prevent horizontal scrollbar from appearing when vertical scrollbar shows/hides
-        QQC2.ScrollBar.horizontal.policy: QQC2.ScrollBar.AlwaysOff
+    header: RowLayout {
+        spacing: Kirigami.Units.smallSpacing
 
-        contentItem: ListView {
-            id: devicesView
+        PlasmaComponents3.Label {
+            text: kdeconnect.isRadarView ? i18n("AirDrop Radar") : i18n("Dispositivos")
+            font.bold: true
+            Layout.leftMargin: Kirigami.Units.smallSpacing
+            Layout.fillWidth: true
+        }
 
-            clip: true
-
-            Layout.margins: 0
-
-            delegate: DeviceDelegate {
-                width: ListView.view.width - ListView.view.leftMargin - ListView.view.rightMargin
+        PlasmaComponents3.ToolButton {
+            icon.name: kdeconnect.isRadarView ? "view-list-details" : "network-wireless"
+            text: kdeconnect.isRadarView ? i18n("Ver lista") : i18n("Ver radar")
+            display: PlasmaComponents3.AbstractButton.IconOnly
+            PlasmaComponents3.ToolTip {
+                text: kdeconnect.isRadarView ? i18n("Cambiar a vista de lista") : i18n("Cambiar a vista de radar AirDrop")
             }
+            onClicked: kdeconnect.isRadarView = !kdeconnect.isRadarView
+        }
+    }
 
-            PlasmaExtras.PlaceholderMessage {
-                width: parent.width
-                anchors.centerIn: parent
-                visible: devicesView.count === 0
+    Item {
+        anchors.fill: parent
 
-                iconName: {
-                    if (pairedDevicesModel.count >= 0) {
-                        return pairedDevicesModel.count === 0 ? "edit-none" : "network-disconnect";
+        AirDropRadar {
+            anchors.fill: parent
+            visible: kdeconnect.isRadarView
+            devicesModel: pairedDevicesModel
+        }
+
+        PlasmaComponents3.ScrollView {
+            anchors.fill: parent
+            visible: !kdeconnect.isRadarView
+            contentWidth: availableWidth
+            
+            // Prevent horizontal scrollbar from appearing when vertical scrollbar shows/hides
+            QQC2.ScrollBar.horizontal.policy: QQC2.ScrollBar.AlwaysOff
+
+            contentItem: ListView {
+                id: devicesView
+
+                clip: true
+
+                Layout.margins: 0
+
+                delegate: DeviceDelegate {
+                    width: ListView.view.width - ListView.view.leftMargin - ListView.view.rightMargin
+                }
+
+                PlasmaExtras.PlaceholderMessage {
+                    width: parent.width
+                    anchors.centerIn: parent
+                    visible: devicesView.count === 0
+
+                    iconName: {
+                        if (pairedDevicesModel.count >= 0) {
+                            return pairedDevicesModel.count === 0 ? "edit-none" : "network-disconnect";
+                        }
+                        return "kdeconnect";
                     }
-                    return "kdeconnect";
-                }
 
-                text: {
-                    if (pairedDevicesModel.count >= 0) {
-                        return pairedDevicesModel.count === 0 ? i18n("No paired devices") : i18np("Paired device is unavailable", "All paired devices are unavailable", pairedDevicesModel.count)
-                    } else if (allDevicesModel.count === 0) {
-                        return i18n("Install KDE Connect on your Android device to integrate it with Plasma!")
+                    text: {
+                        if (pairedDevicesModel.count >= 0) {
+                            return pairedDevicesModel.count === 0 ? i18n("No paired devices") : i18np("Paired device is unavailable", "All paired devices are unavailable", pairedDevicesModel.count)
+                        } else if (allDevicesModel.count === 0) {
+                            return i18n("Install KDE Connect on your Android device to integrate it with Plasma!")
+                        }
                     }
-                }
-                helpfulAction: QQC2.Action {
-                    text: i18n("Pair a Device…")
-                    icon.name: "list-add"
-                    onTriggered: KDEConnect.OpenConfig.openConfiguration()
-                    enabled: pairedDevicesModel.count === 0
-                }
+                    helpfulAction: QQC2.Action {
+                        text: i18n("Pair a Device…")
+                        icon.name: "list-add"
+                        onTriggered: KDEConnect.OpenConfig.openConfiguration()
+                        enabled: pairedDevicesModel.count === 0
+                    }
 
-                PlasmaComponents3.Button {
-                    Layout.leftMargin: Kirigami.Units.gridUnit * 3
-                    Layout.rightMargin: Kirigami.Units.gridUnit * 3
-                    Layout.alignment: Qt.AlignHCenter
-                    Layout.fillWidth: true
-                    visible: allDevicesModel.count === 0
-                    text: i18n("Install from Google Play")
-                    onClicked: Qt.openUrlExternally("https://play.google.com/store/apps/details?id=org.kde.kdeconnect_tp")
-                }
+                    PlasmaComponents3.Button {
+                        Layout.leftMargin: Kirigami.Units.gridUnit * 3
+                        Layout.rightMargin: Kirigami.Units.gridUnit * 3
+                        Layout.alignment: Qt.AlignHCenter
+                        Layout.fillWidth: true
+                        visible: allDevicesModel.count === 0
+                        text: i18n("Install from Google Play")
+                        onClicked: Qt.openUrlExternally("https://play.google.com/store/apps/details?id=org.kde.kdeconnect_tp")
+                    }
 
-                PlasmaComponents3.Button {
-                    Layout.leftMargin: Kirigami.Units.gridUnit * 3
-                    Layout.rightMargin: Kirigami.Units.gridUnit * 3
-                    Layout.alignment: Qt.AlignHCenter
-                    Layout.fillWidth: true
-                    visible: allDevicesModel.count === 0
-                    text: i18n("Install from F-Droid")
-                    onClicked: Qt.openUrlExternally("https://f-droid.org/en/packages/org.kde.kdeconnect_tp/")
+                    PlasmaComponents3.Button {
+                        Layout.leftMargin: Kirigami.Units.gridUnit * 3
+                        Layout.rightMargin: Kirigami.Units.gridUnit * 3
+                        Layout.alignment: Qt.AlignHCenter
+                        Layout.fillWidth: true
+                        visible: allDevicesModel.count === 0
+                        text: i18n("Install from F-Droid")
+                        onClicked: Qt.openUrlExternally("https://f-droid.org/en/packages/org.kde.kdeconnect_tp/")
+                    }
                 }
             }
         }
