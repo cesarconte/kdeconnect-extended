@@ -67,6 +67,8 @@ AvahiDiscovery::AvahiDiscovery(LanLinkProvider *lanLinkProvider)
     : m_avahiServerInterface(kAvahiDbusService, QStringLiteral("/"), QDBusConnection::systemBus())
     , lanLinkProvider(lanLinkProvider)
 {
+    qDBusRegisterMetaType<QByteArrayList>();
+
     connect(&m_avahiServerInterface, &OrgFreedesktopAvahiServer2Interface::StateChanged, this, [](int state, const QString &error) {
         if (state == AVAHI_SERVER_COLLISION) {
             qCWarning(KDECONNECT_CORE) << "Avahi: server collision" << error;
