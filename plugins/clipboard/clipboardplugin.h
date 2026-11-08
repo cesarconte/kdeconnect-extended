@@ -48,6 +48,9 @@
  */
 #define PACKET_TYPE_CLIPBOARD_CONNECT QStringLiteral("kdeconnect.clipboard.connect")
 
+// Default Universal Clipboard TTL: 2 minutes (120 seconds), matching Apple Continuity standard
+constexpr qint64 DEFAULT_CLIPBOARD_TTL_MS = 120000;
+
 // Format to use when sending clipboard picture
 #define CLIPBOARD_IMAGE_FORMAT "PNG"
 

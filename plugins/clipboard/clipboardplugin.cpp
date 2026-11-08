@@ -18,7 +18,9 @@
 #include <QImage>
 #include <QMimeType>
 #include <QObject>
+#include <QPointer>
 #include <QTemporaryDir>
+#include <QTimer>
 #include <QUrl>
 #include <QVariant>
 #include <qloggingcategory.h>
@@ -129,8 +131,13 @@ void ClipboardPlugin::sendClipboard(const QVariant &content)
 
             NetworkPacket np{PACKET_TYPE_CLIPBOARD_FILE};
 
+            const qint64 now = QDateTime::currentMSecsSinceEpoch();
+            const qint64 ttl = config()->getInt(QStringLiteral("clipboardTtlSeconds"), 120) * 1000;
+            np.set<qint64>(QStringLiteral("timestamp"), now);
+            np.set<qint64>(QStringLiteral("expiryTimestamp"), now + ttl);
+
             np.setPayload(buffer, buffer->size());
-            np.set<QString>(QStringLiteral("filename"), QString::number(QDateTime::currentMSecsSinceEpoch()) + CLIPBOARD_IMAGE_EXTENSION);
+            np.set<QString>(QStringLiteral("filename"), QString::number(now) + CLIPBOARD_IMAGE_EXTENSION);
 
             sendPacket(np);
         } else {
@@ -138,6 +145,11 @@ void ClipboardPlugin::sendClipboard(const QVariant &content)
         }
     } else {
         NetworkPacket np{PACKET_TYPE_CLIPBOARD};
+
+        const qint64 now = QDateTime::currentMSecsSinceEpoch();
+        const qint64 ttl = config()->getInt(QStringLiteral("clipboardTtlSeconds"), 120) * 1000;
+        np.set<qint64>(QStringLiteral("timestamp"), now);
+        np.set<qint64>(QStringLiteral("expiryTimestamp"), now + ttl);
 
         QString contentStr = content.toString();
 
@@ -161,6 +173,23 @@ void ClipboardPlugin::sendConnectPacket()
 
 void ClipboardPlugin::receivePacket(const NetworkPacket &np)
 {
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+
+    // Universal Clipboard TTL Expiration Check (macOS Continuity style)
+    if (np.has(QStringLiteral("expiryTimestamp"))) {
+        const qint64 expiry = np.get<qint64>(QStringLiteral("expiryTimestamp"));
+        if (now > expiry) {
+            qCDebug(KDECONNECT_PLUGIN_CLIPBOARD) << "Discarding expired clipboard packet (TTL exceeded by" << (now - expiry) << "ms)";
+            return;
+        }
+    } else if (np.has(QStringLiteral("timestamp"))) {
+        const qint64 packetTime = np.get<qint64>(QStringLiteral("timestamp"));
+        if (packetTime > 0 && (now - packetTime > DEFAULT_CLIPBOARD_TTL_MS)) {
+            qCDebug(KDECONNECT_PLUGIN_CLIPBOARD) << "Discarding legacy clipboard packet exceeding default 2m TTL";
+            return;
+        }
+    }
+
     if (np.type() == PACKET_TYPE_CLIPBOARD_FILE) {
         if (np.hasPayload() && np.has(QStringLiteral("filename"))) {
             QTemporaryDir tmpDir;
@@ -193,6 +222,19 @@ void ClipboardPlugin::receivePacket(const NetworkPacket &np)
     QString content = np.get<QString>(QStringLiteral("content"));
     if (np.type() == PACKET_TYPE_CLIPBOARD) {
         ClipboardListener::instance()->setText(content);
+
+        // Si está configurada la auto-expiración local para datos confidenciales recibidos
+        const bool autoExpire = config()->getBool(QStringLiteral("autoExpireReceivedClipboard"), false);
+        if (autoExpire) {
+            const qint64 ttl = config()->getInt(QStringLiteral("clipboardTtlSeconds"), 120) * 1000;
+            QPointer<ClipboardPlugin> guard(this);
+            QTimer::singleShot(ttl, this, [content, guard]() {
+                if (guard && ClipboardListener::instance()->currentContent().toString() == content) {
+                    qCDebug(KDECONNECT_PLUGIN_CLIPBOARD) << "Purging expired Universal Clipboard content from system clipboard";
+                    ClipboardListener::instance()->setText(QString());
+                }
+            });
+        }
     } else if (np.type() == PACKET_TYPE_CLIPBOARD_CONNECT) {
         qint64 packetTime = np.get<qint64>(QStringLiteral("timestamp"));
         // If the packetTime is 0, it means the timestamp is unknown (so do nothing).
