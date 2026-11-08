@@ -10,7 +10,6 @@
         "Description[es]": "Encuentra, interactúa y controla dispositivos emparejados de KDE Connect desde KRunner",
         "EnabledByDefault": true,
         "Icon": "kdeconnect",
-        "Id": "krunner_kdeconnect",
         "Name": "KDE Connect Devices & Continuity",
         "Name[es]": "Dispositivos y Continuidad de KDE Connect",
         "Version": "1.0"

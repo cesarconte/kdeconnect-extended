@@ -8,9 +8,11 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import QtQuick.Layouts
 
 import org.kde.config as KConfig
 import org.kde.kdeconnect as KDEConnect
+import org.kde.kirigami as Kirigami
 import org.kde.kquickcontrolsaddons as KQuickControlsAddons
 import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.plasmoid
@@ -44,6 +46,10 @@ PlasmoidItem {
     fullRepresentation: FullRepresentation {
         Plasmoid.backgroundHints: root.inPanel ? PlasmaCore.Types.NoBackground : PlasmaCore.Types.DefaultBackground
         devicesModel: connectedDeviceModel
+        Layout.minimumWidth: Kirigami.Units.gridUnit * 19
+        Layout.minimumHeight: Kirigami.Units.gridUnit * 22
+        Layout.preferredWidth: Kirigami.Units.gridUnit * 22
+        Layout.preferredHeight: Kirigami.Units.gridUnit * 25
     }
 
     compactRepresentation: CompactRepresentation {

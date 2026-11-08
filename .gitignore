@@ -35,3 +35,7 @@ CMakeLists.txt.user
 /cmake-build*
 app/resources.generated.qrc
 smsapp/resources.generated.qrc
+pkg/
+src/
+*.pkg.tar.zst
+kdeconnect-extended/

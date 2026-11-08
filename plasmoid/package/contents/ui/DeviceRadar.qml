@@ -16,13 +16,17 @@ import org.kde.kirigami as Kirigami
 import org.kde.plasma.components as PlasmaComponents3
 import org.kde.plasma.extras as PlasmaExtras
 
-Item {
+ColumnLayout {
     id: root
 
     required property KDEConnect.DevicesModel devicesModel
 
     implicitWidth: Kirigami.Units.gridUnit * 22
     implicitHeight: Kirigami.Units.gridUnit * 24
+    Layout.fillWidth: true
+    Layout.fillHeight: true
+
+    spacing: Kirigami.Units.smallSpacing
 
     // Configuración de visibilidad de proximidad
     // 0 = Nadie, 1 = Sólo conocidos, 2 = Todos (10 min)
@@ -42,65 +46,28 @@ Item {
         }
     }
 
-    // Encabezado con estado del radar
-    ColumnLayout {
-        id: headerLayout
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.topMargin: Kirigami.Units.smallSpacing
-        spacing: Kirigami.Units.smallSpacing
-
-        RowLayout {
-            Layout.fillWidth: true
-            Layout.alignment: Qt.AlignHCenter
-
-            Kirigami.Icon {
-                source: "network-wireless"
-                implicitWidth: Kirigami.Units.iconSizes.small
-                implicitHeight: Kirigami.Units.iconSizes.small
-                color: Kirigami.Theme.highlightColor
-            }
-
-            PlasmaComponents3.Label {
-                text: i18n("Radar de KDE Connect")
-                font.bold: true
-                font.pointSize: Kirigami.Theme.defaultFont.pointSize + 1
-            }
-
-            Item { Layout.fillWidth: true }
-
-            PlasmaComponents3.Label {
-                text: root.visibilityMode === 2 
-                    ? i18n("Visible a todos (%1s)", root.countdownSeconds) 
-                    : (root.visibilityMode === 1 ? i18n("Sólo conocidos") : i18n("No visible"))
-                font.pointSize: Kirigami.Theme.smallFont.pointSize
-                opacity: 0.8
-            }
-        }
-
-        PlasmaComponents3.Label {
-            Layout.fillWidth: true
-            horizontalAlignment: Text.AlignHCenter
-            text: i18n("Arrastra y suelta un archivo sobre cualquier dispositivo para compartirlo al instante.")
-            font.pointSize: Kirigami.Theme.smallFont.pointSize
-            color: Kirigami.Theme.disabledTextColor
-            wrapMode: Text.WordWrap
-        }
+    // Subtítulo explicativo
+    PlasmaComponents3.Label {
+        Layout.fillWidth: true
+        Layout.topMargin: Kirigami.Units.smallSpacing
+        horizontalAlignment: Text.AlignHCenter
+        text: i18n("Arrastra y suelta un archivo sobre cualquier dispositivo para compartirlo al instante.")
+        font.pointSize: Kirigami.Theme.smallFont.pointSize
+        color: Kirigami.Theme.disabledTextColor
+        wrapMode: Text.WordWrap
     }
 
     // Área central: Ondas de Radar y Nodos de Dispositivos
     Item {
         id: radarArea
-        anchors.top: headerLayout.bottom
-        anchors.bottom: controlsLayout.top
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.margins: Kirigami.Units.largeSpacing
+        Layout.fillWidth: true
+        Layout.fillHeight: true
+        Layout.minimumHeight: Kirigami.Units.gridUnit * 14
+        clip: true
 
         readonly property real centerX: width / 2
         readonly property real centerY: height / 2
-        readonly property real maxRadius: Math.min(width, height) / 2 - Kirigami.Units.gridUnit * 2
+        readonly property real maxRadius: Math.max(Kirigami.Units.gridUnit * 4, Math.min(width, height) / 2 - Kirigami.Units.gridUnit * 1.5)
 
         // Ondas concéntricas animadas
         Repeater {
@@ -220,7 +187,7 @@ Item {
                 readonly property int totalCount: devicesRepeater.count
                 // Distribuir equitativamente en círculo
                 readonly property real angle: totalCount > 0 ? (index * (2 * Math.PI / totalCount)) - (Math.PI / 2) : 0
-                readonly property real orbitRadius: Math.max(radarArea.maxRadius * 0.72, Kirigami.Units.gridUnit * 5.5)
+                readonly property real orbitRadius: Math.max(radarArea.maxRadius * 0.72, Kirigami.Units.gridUnit * 5.0)
 
                 x: radarArea.centerX + orbitRadius * Math.cos(angle) - width / 2
                 y: radarArea.centerY + orbitRadius * Math.sin(angle) - height / 2
@@ -350,50 +317,70 @@ Item {
         }
     }
 
-    // Controles inferiores: Selector de Visibilidad de proximidad
+    // Controles inferiores: Selector de Visibilidad de proximidad (Estilo macOS AirDrop)
     ColumnLayout {
-        id: controlsLayout
-        anchors.bottom: parent.bottom
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.margins: Kirigami.Units.smallSpacing
-        spacing: Kirigami.Units.smallSpacing
+        Layout.fillWidth: true
+        Layout.alignment: Qt.AlignHCenter
+        Layout.bottomMargin: Kirigami.Units.smallSpacing
+        spacing: 4
 
         PlasmaComponents3.Label {
-            text: i18n("Visibilidad de KDE Connect:")
+            text: root.visibilityMode === 2 && root.countdownSeconds > 0
+                ? i18n("Permitir que me descubran: Todos (%1s)", root.countdownSeconds)
+                : i18n("Permitir que me descubran:")
             font.bold: true
-            font.pointSize: Kirigami.Theme.smallFont.pointSize
+            font.pointSize: Math.max(8, Kirigami.Theme.smallFont.pointSize - 1)
+            color: Kirigami.Theme.disabledTextColor
             Layout.alignment: Qt.AlignHCenter
         }
 
-        RowLayout {
-            Layout.alignment: Qt.AlignHCenter
-            spacing: Kirigami.Units.smallSpacing
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: Kirigami.Units.gridUnit * 2.2
+            radius: Kirigami.Units.cornerRadius
+            color: Kirigami.Theme.backgroundColor
+            border.color: Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, 0.15)
+            border.width: 1
 
-            PlasmaComponents3.Button {
-                text: i18n("Nadie")
-                checkable: true
-                checked: root.visibilityMode === 0
-                icon.name: "dialog-cancel"
-                onClicked: root.visibilityMode = 0
-            }
+            RowLayout {
+                anchors.fill: parent
+                anchors.margins: 2
+                spacing: 2
 
-            PlasmaComponents3.Button {
-                text: i18n("Sólo conocidos")
-                checkable: true
-                checked: root.visibilityMode === 1
-                icon.name: "user-identity"
-                onClicked: root.visibilityMode = 1
-            }
+                PlasmaComponents3.ToolButton {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    text: i18n("Nadie")
+                    icon.name: "dialog-cancel"
+                    checkable: true
+                    checked: root.visibilityMode === 0
+                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    onClicked: root.visibilityMode = 0
+                }
 
-            PlasmaComponents3.Button {
-                text: i18n("Todos (10 min)")
-                checkable: true
-                checked: root.visibilityMode === 2
-                icon.name: "system-users"
-                onClicked: {
-                    root.visibilityMode = 2
-                    root.countdownSeconds = 600
+                PlasmaComponents3.ToolButton {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    text: i18n("Contactos")
+                    icon.name: "user-identity"
+                    checkable: true
+                    checked: root.visibilityMode === 1
+                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    onClicked: root.visibilityMode = 1
+                }
+
+                PlasmaComponents3.ToolButton {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    text: i18n("Todos (10m)")
+                    icon.name: "system-users"
+                    checkable: true
+                    checked: root.visibilityMode === 2
+                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    onClicked: {
+                        root.visibilityMode = 2
+                        root.countdownSeconds = 600
+                    }
                 }
             }
         }

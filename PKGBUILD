@@ -3,7 +3,7 @@
 
 pkgname=kdeconnect-extended
 _pkgname=kdeconnect
-pkgver=27.03.70.r124.g6e48682
+pkgver=27.03.70.r5856.g352ad0c35
 pkgrel=1
 pkgdesc="Extended KDE Connect for KDE Plasma 6 on CachyOS with macOS Continuity features (Device Radar UI, Universal Clipboard TTL, PipeWire Continuity Mic & Camera, Handoff, Proximity Unlock)"
 arch=('x86_64')
