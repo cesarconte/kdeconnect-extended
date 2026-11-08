@@ -164,6 +164,7 @@ add_subdirectory(smsapp)
 if(NOT WIN32 AND NOT APPLE)
     add_subdirectory(kio)
     add_subdirectory(plasmoid)
+    add_subdirectory(krunner)
 endif()
 
 ki18n_install(po)

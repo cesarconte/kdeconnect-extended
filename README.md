@@ -7,6 +7,7 @@ KDE Connect Extended brings next-generation continuity features to Linux and KDE
 - 🔄 **Task & Web Handoff:** Seamlessly resume browsing sessions or active tasks from paired devices on desktop with one-click interactive banner suggestions.
 - 🎙️ **Continuity Microphone (Native PipeWire SPA):** Stream remote smartphone audio directly into Linux as a virtual microphone node (`kdeconnect.continuity_mic`) automatically recognized by WirePlumber and processed through EasyEffects DSP chains.
 - 📋 **Universal Clipboard with TTL Expiration:** 2-minute expiration (TTL = 120s) for synced clips, auto-purging sensitive passwords and avoiding stale clipboard leaks.
+- ⚡ **KRunner Global Quick Actions:** Invoke `krunner_kdeconnect` via Meta/Alt+Space with instant device matching, ring, SFTP browsing, PipeWire Continuity Mic activation, and clipboard push.
 - 🐬 **Dolphin Deep Integration:** Contextual right-click "Compartir vía KDE Connect" directly from Dolphin file manager.
 - 🔒 **Wayland-first Architecture:** Full compatibility with Plasma 6.8 Wayland session, zero legacy X11 or ALSA/PulseAudio dependencies.
 
