@@ -19,6 +19,11 @@
 #include <security/pam_ext.h>
 #include <security/pam_modules.h>
 
+#ifdef PAM_EXTERN
+#undef PAM_EXTERN
+#endif
+#define PAM_EXTERN __attribute__((visibility("default")))
+
 #define KDECONNECT_DEFAULT_TIMEOUT 25
 
 static void print_msg(pam_handle_t *pamh, int is_err, const char *msg)

@@ -12,6 +12,8 @@ target_link_libraries(pam_kdeconnect
 set_target_properties(pam_kdeconnect PROPERTIES
     PREFIX ""
     OUTPUT_NAME "pam_kdeconnect"
+    C_VISIBILITY_PRESET default
+    VISIBILITY_INLINES_HIDDEN 0
 )
 
 install(TARGETS pam_kdeconnect DESTINATION ${KDE_INSTALL_LIBDIR}/security)
