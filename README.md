@@ -1,8 +1,15 @@
-# KDE Connect - desktop app
+# KDE Connect Extended (Plasma Drop & Apple Continuity Suite)
 
-KDE Connect is a multi-platform app that allows your devices to communicate (eg: your phone and your computer).
+KDE Connect Extended brings macOS Golden Gate / Apple Continuity features to Linux and KDE Plasma 6 (Wayland native), built specifically with Qt6, KF6, and PipeWire integration.
 
-## (Some) Features
+## ✨ Next-Gen Continuity Features (Extended Suite)
+- 🎯 **Plasma Drop Radar (AirDrop-style UI):** Kirigami-powered concentric proximity radar with fluid animations, device discovery, and native Drag-and-Drop sharing straight to remote peer avatars.
+- 🎙️ **Continuity Microphone (Native PipeWire SPA):** Stream remote smartphone audio directly into Linux as a virtual microphone node (`kdeconnect.continuity_mic`) automatically recognized by WirePlumber and processed through EasyEffects DSP chains.
+- 📋 **Universal Clipboard with TTL Expiration:** macOS Continuity-standard 2-minute expiration (TTL = 120s) for synced clips, auto-purging sensitive passwords and avoiding stale clipboard leaks.
+- 🐬 **Dolphin Deep Integration:** Contextual right-click "Compartir vía Plasma Drop (AirDrop)" directly from Dolphin file manager.
+- 🔒 **Wayland-first Architecture:** Full compatibility with Plasma 6.8 Wayland session, zero legacy X11 or ALSA/PulseAudio dependencies.
+
+## (Standard) Features
 - **Shared clipboard**: copy and paste between your phone and your computer (or any other device).
 - **Notification sync**: Read and reply to your Android notifications from the desktop.
 - **Share files and URLs** instantly from one device to another including some filesystem integration.
