@@ -23,6 +23,14 @@
 
 K_PLUGIN_CLASS_WITH_JSON(BiometricAuthPlugin, "kdeconnect_biometricauth.json")
 
+BiometricAuthPlugin::BiometricAuthPlugin(QObject *parent, const QVariantList &args)
+    : KdeConnectPlugin(parent, args)
+{
+    setupSocketServer();
+    connect(&m_timeoutTimer, &QTimer::timeout, this, &BiometricAuthPlugin::handleAuthTimeout);
+    m_timeoutTimer.setSingleShot(true);
+}
+
 BiometricAuthPlugin::~BiometricAuthPlugin()
 {
     if (m_server) {
@@ -30,13 +38,6 @@ BiometricAuthPlugin::~BiometricAuthPlugin()
         delete m_server;
         m_server = nullptr;
     }
-}
-
-void BiometricAuthPlugin::initialize()
-{
-    setupSocketServer();
-    connect(&m_timeoutTimer, &QTimer::timeout, this, &BiometricAuthPlugin::handleAuthTimeout);
-    m_timeoutTimer.setSingleShot(true);
 }
 
 bool BiometricAuthPlugin::isPending() const
@@ -188,8 +189,21 @@ void BiometricAuthPlugin::notifyDesktop(const QString &service)
     auto *notif = new KNotification(QStringLiteral("notification"), KNotification::CloseOnTimeout);
     notif->setIconName(QStringLiteral("security-high"));
     notif->setComponentName(QStringLiteral("kdeconnect"));
-    notif->setTitle(i18n("Autenticación biométrica requerida"));
-    notif->setText(i18n("Confirma la solicitud de %1 en tu dispositivo %2", service, device()->name()));
+    notif->setTitle(i18n("Autenticación solicitada"));
+    notif->setText(i18n("Solicitud de %1: esperando confirmación en %2", service, device()->name()));
+
+    auto *approveAction = notif->addAction(i18n("Aprobar"));
+    connect(approveAction, &KNotificationAction::activated, this, [this, notif] {
+        respondBiometric(true);
+        notif->close();
+    });
+
+    auto *rejectAction = notif->addAction(i18n("Rechazar"));
+    connect(rejectAction, &KNotificationAction::activated, this, [this, notif] {
+        respondBiometric(false);
+        notif->close();
+    });
+
     notif->sendEvent();
 }
 

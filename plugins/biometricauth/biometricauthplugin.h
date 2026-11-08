@@ -25,10 +25,9 @@ class BiometricAuthPlugin : public KdeConnectPlugin
     Q_PROPERTY(QString lastPrompt READ lastPrompt NOTIFY pendingChanged)
 
 public:
-    using KdeConnectPlugin::KdeConnectPlugin;
+    BiometricAuthPlugin(QObject *parent, const QVariantList &args);
     ~BiometricAuthPlugin() override;
 
-    void initialize();
     bool isPending() const;
     QString lastPrompt() const;
 
