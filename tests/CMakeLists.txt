@@ -43,6 +43,15 @@ if(NOT APPLE AND NOT WIN32)
     )
     target_sources(continuitymictest PRIVATE ../plugins/continuitymic/continuitymicengine.cpp)
     target_include_directories(continuitymictest PRIVATE ../plugins/continuitymic)
+
+    ecm_add_test(continuitycameratest.cpp
+        LINK_LIBRARIES
+            ${kdeconnect_libraries}
+            Qt::Gui
+            PkgConfig::PipeWire
+    )
+    target_sources(continuitycameratest PRIVATE ../plugins/continuitycamera/continuitycameraengine.cpp)
+    target_include_directories(continuitycameratest PRIVATE ../plugins/continuitycamera)
 endif()
 
 # Do not touch the clipboard of the running session (and avoid a KSystemClipboard deadlock on exit under Wayland)

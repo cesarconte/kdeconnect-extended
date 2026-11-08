@@ -52,6 +52,7 @@ endif()
 
 if(NOT APPLE AND NOT WIN32)
     add_subdirectory(continuitymic)
+    add_subdirectory(continuitycamera)
     add_subdirectory(handoff)
 endif()
 

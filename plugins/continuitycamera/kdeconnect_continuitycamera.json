@@ -1,0 +1,29 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "yugurta@gmail.com",
+                "Name": "Cesar"
+            }
+        ],
+        "Description": "Use your remote smartphone or tablet camera as a high-definition webcam via PipeWire in KDE Plasma 6",
+        "Description[es]": "Usa la cámara de tu smartphone o tablet como cámara web de alta definición vía PipeWire en KDE Plasma 6",
+        "EnabledByDefault": true,
+        "Icon": "camera-web",
+        "Id": "kdeconnect_continuitycamera",
+        "Name": "Continuity Camera (PipeWire)",
+        "Name[es]": "Cámara de Continuidad (PipeWire)",
+        "ServiceTypes": [
+            "KdeConnect/Plugin"
+        ],
+        "Version": "1.0"
+    },
+    "X-KdeConnect-OutgoingPacketType": [
+        "kdeconnect.continuitycamera.request",
+        "kdeconnect.continuitycamera.stop"
+    ],
+    "X-KdeConnect-SupportedPacketType": [
+        "kdeconnect.continuitycamera.frame",
+        "kdeconnect.continuitycamera.state"
+    ]
+}
