@@ -210,6 +210,10 @@ void SharePlugin::receivePacket(const NetworkPacket &np)
         KNotificationAction *textEditorAction = notif->addAction(i18nc("@action:button Edit text with default text editor", "Open in Text Editor"));
         connect(textEditorAction, &KNotificationAction::activated, this, openTextEditor);
 
+        if (isWebUrl(url) && device()->hasPlugin(QStringLiteral("kdeconnect_handoff"))) {
+            return;
+        }
+
         if (isWebUrl(url)) {
             KNotificationAction *openLinkAction = notif->addAction(i18nc("@action:button Open URL with default app", "Open Link"));
             connect(openLinkAction, &KNotificationAction::activated, this, [this, url, notif] {
@@ -224,8 +228,12 @@ void SharePlugin::receivePacket(const NetworkPacket &np)
     } else if (np.has(QStringLiteral("url"))) {
         QUrl url = QUrl::fromEncoded(np.get<QByteArray>(QStringLiteral("url")));
         if (isWebUrl(url)) {
-            auto *job = new KIO::OpenUrlJob(url);
-            job->start();
+            // macOS Handoff continuity: If Handoff plugin is active on the device,
+            // opening is deferred to the user's action via Handoff banner or notification.
+            if (!device()->hasPlugin(QStringLiteral("kdeconnect_handoff"))) {
+                auto *job = new KIO::OpenUrlJob(url);
+                job->start();
+            }
         }
         Q_EMIT shareReceived(url.toString());
     } else {

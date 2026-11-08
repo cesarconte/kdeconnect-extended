@@ -20,10 +20,12 @@
     },
     "X-KdeConnect-OutgoingPacketType": [
         "kdeconnect.handoff.activity",
-        "kdeconnect.handoff.request"
+        "kdeconnect.handoff.request",
+        "kdeconnect.share.request"
     ],
     "X-KdeConnect-SupportedPacketType": [
         "kdeconnect.handoff.activity",
-        "kdeconnect.handoff.clear"
+        "kdeconnect.handoff.clear",
+        "kdeconnect.share.request"
     ]
 }

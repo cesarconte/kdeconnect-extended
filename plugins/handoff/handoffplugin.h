@@ -14,6 +14,7 @@
 
 #define PACKET_TYPE_HANDOFF_ACTIVITY QStringLiteral("kdeconnect.handoff.activity")
 #define PACKET_TYPE_HANDOFF_CLEAR QStringLiteral("kdeconnect.handoff.clear")
+#define PACKET_TYPE_SHARE_REQUEST QStringLiteral("kdeconnect.share.request")
 
 class HandoffPlugin : public KdeConnectPlugin
 {
@@ -38,6 +39,7 @@ public:
     Q_SCRIPTABLE void openCurrentActivity();
     Q_SCRIPTABLE void broadcastActivity(const QString &url, const QString &title, const QString &sourceApp);
     Q_SCRIPTABLE void clearActivity();
+    void setActivity(const QString &url, const QString &title, const QString &sourceApp);
 
     void receivePacket(const NetworkPacket &np) override;
     QString dbusPath() const override;

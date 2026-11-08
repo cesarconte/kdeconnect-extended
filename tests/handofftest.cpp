@@ -43,6 +43,31 @@ private Q_SLOTS:
         NetworkPacket clearNp(PACKET_TYPE_HANDOFF_CLEAR);
         QCOMPARE(clearNp.type(), PACKET_TYPE_HANDOFF_CLEAR);
     }
+
+    void testShareRequestUrlPacket()
+    {
+        const QByteArray testUrl = "https://kde.org/plasma-desktop";
+        NetworkPacket np(PACKET_TYPE_SHARE_REQUEST);
+        np.set(QStringLiteral("url"), testUrl);
+
+        QCOMPARE(np.type(), PACKET_TYPE_SHARE_REQUEST);
+        QUrl parsedUrl = QUrl::fromEncoded(np.get<QByteArray>(QStringLiteral("url")));
+        QVERIFY(parsedUrl.isValid());
+        QCOMPARE(parsedUrl.scheme(), QStringLiteral("https"));
+        QCOMPARE(parsedUrl.host(), QStringLiteral("kde.org"));
+    }
+
+    void testShareRequestTextPacket()
+    {
+        const QString testText = QStringLiteral("https://youtube.com/watch?v=12345");
+        NetworkPacket np(PACKET_TYPE_SHARE_REQUEST);
+        np.set(QStringLiteral("text"), testText);
+
+        QCOMPARE(np.type(), PACKET_TYPE_SHARE_REQUEST);
+        QUrl parsedUrl = QUrl::fromUserInput(np.get<QString>(QStringLiteral("text")));
+        QVERIFY(parsedUrl.isValid());
+        QCOMPARE(parsedUrl.host(), QStringLiteral("youtube.com"));
+    }
 };
 
 QTEST_MAIN(HandoffTest)

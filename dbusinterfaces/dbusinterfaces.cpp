@@ -199,4 +199,13 @@ ClipboardDbusInterface::ClipboardDbusInterface(const QString &deviceId, QObject 
     connect(this, &OrgKdeKdeconnectDeviceClipboardInterface::autoShareDisabledChanged, this, &ClipboardDbusInterface::autoShareDisabledChangedProxy);
 }
 
+HandoffDbusInterface::HandoffDbusInterface(const QString &deviceId, QObject *parent)
+    : OrgKdeKdeconnectDeviceHandoffInterface(DaemonDbusInterface::activatedService(),
+                                             QLatin1String("/modules/kdeconnect/devices/%1/handoff").arg(deviceId),
+                                             QDBusConnection::sessionBus(),
+                                             parent)
+{
+    connect(this, &OrgKdeKdeconnectDeviceHandoffInterface::activityChanged, this, &HandoffDbusInterface::activityChangedProxy);
+}
+
 #include "moc_dbusinterfaces.cpp"

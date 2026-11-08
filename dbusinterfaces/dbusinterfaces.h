@@ -18,6 +18,7 @@
 #include "generated/deviceinterface.h"
 #include "generated/devicenotificationsinterface.h"
 #include "generated/devicesftpinterface.h"
+#include "generated/handoffinterface.h"
 #include "generated/lockdeviceinterface.h"
 #include "generated/mprisremoteinterface.h"
 #include "generated/notificationinterface.h"
@@ -258,6 +259,20 @@ public:
     explicit ClipboardDbusInterface(const QString &deviceId, QObject *parent = nullptr);
 Q_SIGNALS:
     void autoShareDisabledChangedProxy(bool b);
+};
+
+class KDECONNECTDBUSINTERFACES_EXPORT HandoffDbusInterface : public OrgKdeKdeconnectDeviceHandoffInterface
+{
+    Q_OBJECT
+    Q_PROPERTY(bool hasActiveActivity READ hasActiveActivity NOTIFY activityChangedProxy)
+    Q_PROPERTY(QString currentUrl READ currentUrl NOTIFY activityChangedProxy)
+    Q_PROPERTY(QString currentTitle READ currentTitle NOTIFY activityChangedProxy)
+    Q_PROPERTY(QString sourceApp READ sourceApp NOTIFY activityChangedProxy)
+    Q_PROPERTY(qint64 activityTimestamp READ activityTimestamp NOTIFY activityChangedProxy)
+public:
+    explicit HandoffDbusInterface(const QString &deviceId, QObject *parent = nullptr);
+Q_SIGNALS:
+    void activityChangedProxy();
 };
 
 #endif

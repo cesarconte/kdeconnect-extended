@@ -213,6 +213,14 @@ class RemoteSystemVolumeDbusInterfaceForeign
     QML_FOREIGN(RemoteSystemVolumeDbusInterface)
 };
 
+class HandoffDbusInterfaceForeign
+{
+    Q_GADGET
+    QML_NAMED_ELEMENT(HandoffDbusInterface)
+    QML_UNCREATABLE("")
+    QML_FOREIGN(HandoffDbusInterface)
+};
+
 class DaemonDbusInterfaceForeign
 {
     Q_GADGET
@@ -418,6 +426,18 @@ public:
     Q_INVOKABLE MprisDbusInterface *create(const QString &deviceId)
     {
         return new MprisDbusInterface(deviceId);
+    }
+};
+
+class HandoffDbusInterfaceFactory : public QObject
+{
+    Q_OBJECT
+    QML_ELEMENT
+    QML_SINGLETON
+public:
+    Q_INVOKABLE HandoffDbusInterface *create(const QString &deviceId)
+    {
+        return new HandoffDbusInterface(deviceId);
     }
 };
 

@@ -9,4 +9,6 @@ target_link_libraries(kdeconnect_handoff
     Qt::DBus
     Qt::Gui
     KF6::I18n
+    KF6::Notifications
+    KF6::KIOWidgets
 )

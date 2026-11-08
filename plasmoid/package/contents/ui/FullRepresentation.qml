@@ -124,7 +124,7 @@ PlasmaExtras.Representation {
             id: handoffBanner
             Layout.fillWidth: true
             Layout.margins: Kirigami.Units.smallSpacing
-            visible: hasActivity
+            devicesModel: pairedDevicesModel
         }
 
         Item {
