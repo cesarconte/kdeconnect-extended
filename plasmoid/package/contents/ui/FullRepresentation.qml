@@ -16,10 +16,12 @@ import org.kde.kdeconnect as KDEConnect
 import org.kde.kirigami as Kirigami
 import org.kde.plasma.components as PlasmaComponents3
 import org.kde.plasma.extras as PlasmaExtras
+import org.kde.plasma.plasmoid
 
 PlasmaExtras.Representation {
     id: kdeconnect
 
+    property PlasmoidItem plasmoidItem
     property alias devicesModel: devicesView.model
     property bool isRadarView: true
 
@@ -32,6 +34,12 @@ PlasmaExtras.Representation {
     Layout.minimumHeight: Kirigami.Units.gridUnit * 22
     Layout.preferredWidth: Kirigami.Units.gridUnit * 22
     Layout.preferredHeight: Kirigami.Units.gridUnit * 25
+
+    Component.onCompleted: {
+        if (kdeconnect.isRadarView && kdeconnect.plasmoidItem) {
+            kdeconnect.plasmoidItem.isPinned = true;
+        }
+    }
 
     KDEConnect.DevicesModel {
         id: allDevicesModel
@@ -59,6 +67,24 @@ PlasmaExtras.Representation {
             Layout.fillWidth: true
         }
 
+        // Botón Pin: mantener ventana fijada para permitir arrastrar desde Dolphin sin auto-cierre
+        PlasmaComponents3.ToolButton {
+            id: pinBtn
+            icon.name: "window-pin"
+            text: i18n("Mantener abierto")
+            display: PlasmaComponents3.AbstractButton.IconOnly
+            checkable: true
+            checked: kdeconnect.plasmoidItem ? kdeconnect.plasmoidItem.isPinned : true
+            PlasmaComponents3.ToolTip {
+                text: pinBtn.checked ? i18n("Fijada abierta (permite arrastrar archivos desde Dolphin sin que se cierre)") : i18n("Desanclada (cerrar al cambiar de ventana)")
+            }
+            onToggled: {
+                if (kdeconnect.plasmoidItem) {
+                    kdeconnect.plasmoidItem.isPinned = checked;
+                }
+            }
+        }
+
         PlasmaComponents3.ToolButton {
             icon.name: kdeconnect.isRadarView ? "view-list-details" : "network-wireless"
             text: kdeconnect.isRadarView ? i18n("Ver lista") : i18n("Ver radar")
@@ -66,7 +92,27 @@ PlasmaExtras.Representation {
             PlasmaComponents3.ToolTip {
                 text: kdeconnect.isRadarView ? i18n("Cambiar a vista de lista") : i18n("Cambiar a vista de radar")
             }
-            onClicked: kdeconnect.isRadarView = !kdeconnect.isRadarView
+            onClicked: {
+                kdeconnect.isRadarView = !kdeconnect.isRadarView;
+                if (kdeconnect.isRadarView && kdeconnect.plasmoidItem) {
+                    kdeconnect.plasmoidItem.isPinned = true;
+                }
+            }
+        }
+
+        PlasmaComponents3.ToolButton {
+            visible: kdeconnect.plasmoidItem && kdeconnect.plasmoidItem.isPinned
+            icon.name: "window-close"
+            text: i18n("Cerrar")
+            display: PlasmaComponents3.AbstractButton.IconOnly
+            PlasmaComponents3.ToolTip {
+                text: i18n("Cerrar ventana")
+            }
+            onClicked: {
+                if (kdeconnect.plasmoidItem) {
+                    kdeconnect.plasmoidItem.expanded = false;
+                }
+            }
         }
     }
 

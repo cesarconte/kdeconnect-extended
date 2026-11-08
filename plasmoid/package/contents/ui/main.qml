@@ -27,6 +27,10 @@ PlasmoidItem {
         PlasmaCore.Types.LeftEdge,
     ].includes(Plasmoid.location)
 
+    // Permite mantener fijada la ventana abierta para arrastrar archivos sin auto-cierre
+    property bool isPinned: true
+    hideOnWindowDeactivate: !isPinned
+
     KDEConnect.DevicesModel {
         id: connectedDeviceModel
         displayFilter: KDEConnect.DevicesModel.Paired | KDEConnect.DevicesModel.Reachable
@@ -44,6 +48,7 @@ PlasmoidItem {
     Plasmoid.status: connectedDeviceModel.count > 0 ? PlasmaCore.Types.ActiveStatus : PlasmaCore.Types.PassiveStatus
 
     fullRepresentation: FullRepresentation {
+        plasmoidItem: root
         Plasmoid.backgroundHints: root.inPanel ? PlasmaCore.Types.NoBackground : PlasmaCore.Types.DefaultBackground
         devicesModel: connectedDeviceModel
         Layout.minimumWidth: Kirigami.Units.gridUnit * 19
