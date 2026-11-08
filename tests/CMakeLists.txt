@@ -28,5 +28,17 @@ if (WIN32 OR APPLE)
     ecm_add_test(mdnstest.cpp LINK_LIBRARIES ${kdeconnect_libraries})
 endif()
 
+if(NOT APPLE AND NOT WIN32)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(PipeWire REQUIRED IMPORTED_TARGET libpipewire-0.3)
+    ecm_add_test(continuitymictest.cpp 
+        LINK_LIBRARIES 
+            ${kdeconnect_libraries}
+            PkgConfig::PipeWire
+    )
+    target_sources(continuitymictest PRIVATE ../plugins/continuitymic/continuitymicengine.cpp)
+    target_include_directories(continuitymictest PRIVATE ../plugins/continuitymic)
+endif()
+
 # Do not touch the clipboard of the running session (and avoid a KSystemClipboard deadlock on exit under Wayland)
 set_tests_properties(notificationstest pluginloadtest PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

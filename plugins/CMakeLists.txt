@@ -50,6 +50,9 @@ if (WITH_PULSEAUDIO OR WIN32 OR APPLE)
     add_subdirectory(systemvolume)
 endif()
 
+if(NOT APPLE AND NOT WIN32)
+    add_subdirectory(continuitymic)
+endif()
 
 # If we split notifications per plugin, in several notifyrc files, they won't
 # appear in the same group in the Notifications KCM

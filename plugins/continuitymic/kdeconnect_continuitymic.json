@@ -1,0 +1,29 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "yugurta@gmail.com",
+                "Name": "Cesar"
+            }
+        ],
+        "Description": "Use your remote smartphone or device as a high-fidelity virtual microphone through PipeWire & EasyEffects",
+        "Description[es]": "Usa tu teléfono o dispositivo remoto como micrófono virtual de alta fidelidad vía PipeWire y EasyEffects",
+        "EnabledByDefault": true,
+        "Icon": "audio-input-microphone",
+        "Id": "kdeconnect_continuitymic",
+        "Name": "Continuity Microphone (PipeWire)",
+        "Name[es]": "Micrófono de Continuidad (PipeWire)",
+        "ServiceTypes": [
+            "KdeConnect/Plugin"
+        ],
+        "Version": "1.0"
+    },
+    "X-KdeConnect-OutgoingPacketType": [
+        "kdeconnect.continuitymic.request",
+        "kdeconnect.continuitymic.stop"
+    ],
+    "X-KdeConnect-SupportedPacketType": [
+        "kdeconnect.continuitymic.audio",
+        "kdeconnect.continuitymic.state"
+    ]
+}
