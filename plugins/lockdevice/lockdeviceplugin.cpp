@@ -51,6 +51,110 @@ LockDevicePlugin::LockDevicePlugin(QObject *parent, const QVariantList &args)
             });
 
     m_localLocked = m_login1Interface.lockedHint();
+
+    m_walkAwayTimer.setSingleShot(true);
+    m_walkAwayTimer.setInterval(15000); // 15 segundos de gracia al alejarse
+    connect(&m_walkAwayTimer, &QTimer::timeout, this, [this]() {
+        if (isWalkAwayLockEnabled() && !device()->isReachable() && !m_localLocked) {
+            qCDebug(KDECONNECT_PLUGIN_LOCKDEVICE) << "Walk-away threshold exceeded, locking session";
+            m_login1Interface.Lock();
+        }
+    });
+
+    connect(device(), &Device::reachableChanged, this, [this](bool reachable) {
+        if (!reachable) {
+            if (isWalkAwayLockEnabled() && !m_localLocked) {
+                m_walkAwayTimer.start();
+            }
+        } else {
+            m_walkAwayTimer.stop();
+            if (isAutoUnlockEnabled() && m_localLocked) {
+                initiateProximityChallenge();
+            }
+        }
+    });
+}
+
+bool LockDevicePlugin::isAutoUnlockEnabled() const
+{
+    return config()->getBool(QStringLiteral("autoUnlockOnProximity"), false);
+}
+
+void LockDevicePlugin::setAutoUnlockEnabled(bool enabled)
+{
+    config()->set(QStringLiteral("autoUnlockOnProximity"), enabled);
+    Q_EMIT autoUnlockChanged(enabled);
+}
+
+bool LockDevicePlugin::isWalkAwayLockEnabled() const
+{
+    return config()->getBool(QStringLiteral("lockOnDisconnect"), false);
+}
+
+void LockDevicePlugin::setWalkAwayLockEnabled(bool enabled)
+{
+    config()->set(QStringLiteral("lockOnDisconnect"), enabled);
+    Q_EMIT walkAwayLockChanged(enabled);
+}
+
+void LockDevicePlugin::initiateProximityChallenge()
+{
+    if (!device()->isReachable()) {
+        return;
+    }
+
+    const quint64 randomVal = QRandomGenerator::securelySeeded().generate64();
+    m_currentChallengeNonce = QByteArray::number(randomVal, 16);
+    m_challengeTimestamp = QDateTime::currentMSecsSinceEpoch();
+
+    NetworkPacket np(PACKET_TYPE_LOCK_REQUEST);
+    np.set(QStringLiteral("proximityChallenge"), m_currentChallengeNonce);
+    sendPacket(np);
+    qCDebug(KDECONNECT_PLUGIN_LOCKDEVICE) << "Dispatched proximity unlock challenge to" << device()->name();
+}
+
+void LockDevicePlugin::handleProximityChallenge(const NetworkPacket &np)
+{
+    const QByteArray nonce = np.get<QByteArray>(QStringLiteral("proximityChallenge"));
+    if (nonce.isEmpty()) {
+        return;
+    }
+
+    QByteArray payload = nonce;
+    payload.append(device()->id().toUtf8());
+    const QByteArray expectedResponse = QCryptographicHash::hash(payload, QCryptographicHash::Sha256).toHex();
+    NetworkPacket resp(PACKET_TYPE_LOCK);
+    resp.set(QStringLiteral("proximityResponse"), expectedResponse);
+    sendPacket(resp);
+}
+
+void LockDevicePlugin::handleProximityResponse(const NetworkPacket &np)
+{
+    const QByteArray response = np.get<QByteArray>(QStringLiteral("proximityResponse"));
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+
+    // Comprobar frescura del nonce (menos de 5 segundos)
+    if (m_currentChallengeNonce.isEmpty() || (now - m_challengeTimestamp > 5000)) {
+        qCWarning(KDECONNECT_PLUGIN_LOCKDEVICE) << "Stale or missing proximity challenge nonce, ignoring";
+        m_currentChallengeNonce.clear();
+        return;
+    }
+
+    QByteArray payload = m_currentChallengeNonce;
+    payload.append(device()->id().toUtf8());
+    const QByteArray expectedResponse = QCryptographicHash::hash(payload, QCryptographicHash::Sha256).toHex();
+    m_currentChallengeNonce.clear();
+
+    if (response == expectedResponse) {
+        qCDebug(KDECONNECT_PLUGIN_LOCKDEVICE) << "Proximity cryptographic challenge verified! Unlocking screen.";
+        m_login1Interface.Unlock();
+        Daemon::instance()->sendSimpleNotification(QStringLiteral("proximityUnlockSuccess"),
+                                                   device()->name(),
+                                                   i18n("Sesión desbloqueada vía KDE Connect"),
+                                                   QStringLiteral("unlock"));
+    } else {
+        qCWarning(KDECONNECT_PLUGIN_LOCKDEVICE) << "Proximity challenge verification failed: invalid cryptographic proof";
+    }
 }
 
 bool LockDevicePlugin::isLocked() const
@@ -95,6 +199,14 @@ void LockDevicePlugin::receivePacket(const NetworkPacket &np)
         }
     }
 
+    if (np.has(QStringLiteral("proximityChallenge"))) {
+        handleProximityChallenge(np);
+    }
+
+    if (np.has(QStringLiteral("proximityResponse"))) {
+        handleProximityResponse(np);
+    }
+
     if (np.has(QStringLiteral("setLocked"))) {
         const bool lock = np.get<bool>(QStringLiteral("setLocked"));
         bool success = false;
@@ -121,6 +233,10 @@ void LockDevicePlugin::connected()
 {
     NetworkPacket np(PACKET_TYPE_LOCK_REQUEST, {{QStringLiteral("requestLocked"), QVariant()}});
     sendPacket(np);
+
+    if (isAutoUnlockEnabled() && m_localLocked) {
+        initiateProximityChallenge();
+    }
 }
 
 QString LockDevicePlugin::dbusPath() const
