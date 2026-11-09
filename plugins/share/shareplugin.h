@@ -50,6 +50,8 @@ private:
     QUrl getFileDestination(const QString filename) const;
     void setDateModified(const QUrl &destination, const qint64 timestamp);
     void setDateCreated(const QUrl &destination, const qint64 timestamp);
+    void performOcrOnReceivedImage(const QString &filePath);
+    void handleOcrResult(const QString &text, const QString &filePath);
 
     QPointer<CompositeFileTransferJob> m_compositeJob;
 };

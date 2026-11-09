@@ -11,6 +11,8 @@
 #include <QDesktopServices>
 #include <QDir>
 #include <QMimeData>
+#include <QMimeDatabase>
+#include <QMimeType>
 #include <QProcess>
 #include <QStandardPaths>
 #include <QTemporaryFile>
@@ -252,9 +254,90 @@ void SharePlugin::finished(KJob *job, const qint64 dateCreated, const qint64 dat
         if (open) {
             QDesktopServices::openUrl(ftjob->destination());
         }
+
+        // On-the-Fly OCR for received images
+        performOcrOnReceivedImage(ftjob->destination().toLocalFile());
     } else {
         qCDebug(KDECONNECT_PLUGIN_SHARE) << "File transfer failed." << (ftjob ? ftjob->destination() : QUrl());
     }
+}
+
+void SharePlugin::performOcrOnReceivedImage(const QString &filePath)
+{
+    QFileInfo fi(filePath);
+    if (!fi.exists() || !fi.isFile()) {
+        return;
+    }
+
+    QMimeDatabase db;
+    QMimeType mime = db.mimeTypeForFile(filePath);
+    if (!mime.name().startsWith(QLatin1String("image/"))) {
+        return;
+    }
+
+    QString tesseractBin = QStandardPaths::findExecutable(QStringLiteral("tesseract"));
+    if (tesseractBin.isEmpty()) {
+        if (QFileInfo::exists(QStringLiteral("/usr/bin/tesseract"))) {
+            tesseractBin = QStringLiteral("/usr/bin/tesseract");
+        } else {
+            return;
+        }
+    }
+
+    QString languages = QStringLiteral("eng");
+    if (QFileInfo::exists(QStringLiteral("/usr/share/tessdata/spa.traineddata"))) {
+        languages = QStringLiteral("spa+eng");
+    }
+
+    auto *process = new QProcess(this);
+    connect(process,
+            QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this,
+            [this, process, filePath](int exitCode, QProcess::ExitStatus exitStatus) {
+                process->deleteLater();
+                if (exitCode == 0 && exitStatus == QProcess::NormalExit) {
+                    const QString text = QString::fromUtf8(process->readAllStandardOutput()).trimmed();
+                    if (!text.isEmpty()) {
+                        handleOcrResult(text, filePath);
+                    }
+                }
+            });
+
+    process->start(tesseractBin,
+                   {filePath,
+                    QStringLiteral("stdout"),
+                    QStringLiteral("--oem"),
+                    QStringLiteral("1"),
+                    QStringLiteral("-l"),
+                    languages,
+                    QStringLiteral("--loglevel"),
+                    QStringLiteral("ERROR")});
+}
+
+void SharePlugin::handleOcrResult(const QString &text, const QString &filePath)
+{
+    qCDebug(KDECONNECT_PLUGIN_SHARE) << "OCR detected" << text.length() << "characters from shared image" << filePath;
+
+    auto *notif = new KNotification(QStringLiteral("notification"), KNotification::CloseOnTimeout);
+    notif->setComponentName(QStringLiteral("kdeconnect"));
+    notif->setTitle(i18n("Text Detected in Shared Image (OCR)"));
+
+    QString preview = text;
+    if (preview.length() > 140) {
+        preview = preview.left(137) + QStringLiteral("...");
+    }
+    notif->setText(preview);
+    notif->setIconName(QStringLiteral("edit-copy"));
+
+    auto *copyAction = notif->addAction(i18nc("@action:button Copy text to clipboard", "Copy Text"));
+    connect(copyAction, &KNotificationAction::activated, this, [text, notif]() {
+        auto *mimeData = new QMimeData;
+        mimeData->setText(text);
+        KSystemClipboard::instance()->setMimeData(mimeData, QClipboard::Clipboard);
+        notif->close();
+    });
+
+    notif->sendEvent();
 }
 
 void SharePlugin::openDestinationFolder()
