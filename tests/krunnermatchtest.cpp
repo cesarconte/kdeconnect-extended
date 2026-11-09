@@ -23,8 +23,12 @@ private Q_SLOTS:
         QCOMPARE(micAction.id(), QStringLiteral("mic"));
         QCOMPARE(micAction.iconSource(), QStringLiteral("audio-input-microphone"));
 
-        QList<KRunner::Action> actions = {ringAction, micAction};
-        QCOMPARE(actions.count(), 2);
+        KRunner::Action flickAction(QStringLiteral("flick"), QStringLiteral("arrow-right-double"), QStringLiteral("Lanzar archivo al móvil (Spatial Flick)"));
+        QCOMPARE(flickAction.id(), QStringLiteral("flick"));
+        QCOMPARE(flickAction.iconSource(), QStringLiteral("arrow-right-double"));
+
+        QList<KRunner::Action> actions = {ringAction, micAction, flickAction};
+        QCOMPARE(actions.count(), 3);
     }
 
     void testQueryMatchConstruction()
@@ -41,6 +45,25 @@ private Q_SLOTS:
         QCOMPARE(match.subtext(), QStringLiteral("Dispositivo KDE Connect conectado"));
         QCOMPARE(match.iconName(), QStringLiteral("smartphone"));
         QCOMPARE(match.relevance(), 0.95);
+    }
+
+    void testRemoteFileMatchConstruction()
+    {
+        KRunner::QueryMatch match;
+        const QString remotePath = QStringLiteral("/run/user/1000/f151e55ead63488c839b638f43e6d1ce/DCIM/Camera/IMG_20261109_120000.jpg");
+        match.setId(QStringLiteral("kdeconnect:file:") + remotePath);
+        match.setData(remotePath);
+        match.setText(QStringLiteral("IMG_20261109_120000.jpg"));
+        match.setSubtext(QStringLiteral("En Redmi Note 14 Pro 5G · Camera"));
+        match.setIconName(QStringLiteral("image-jpeg"));
+        match.setRelevance(0.80);
+
+        QVERIFY(match.data().toString().startsWith(QLatin1Char('/')));
+        QCOMPARE(match.data().toString(), remotePath);
+        QCOMPARE(match.text(), QStringLiteral("IMG_20261109_120000.jpg"));
+        QCOMPARE(match.subtext(), QStringLiteral("En Redmi Note 14 Pro 5G · Camera"));
+        QCOMPARE(match.iconName(), QStringLiteral("image-jpeg"));
+        QCOMPARE(match.relevance(), 0.80);
     }
 };
 

@@ -55,6 +55,14 @@ ecm_add_test(spatialpresencetest.cpp
 )
 target_sources(spatialpresencetest PRIVATE ../plugins/plasmadeck/deckserver.cpp)
 target_include_directories(spatialpresencetest PRIVATE ../plugins/plasmadeck ../plugins/spatialpresence)
+
+ecm_add_test(spatialflicktest.cpp
+    LINK_LIBRARIES
+        ${kdeconnect_libraries}
+        Qt6::Network
+)
+target_sources(spatialflicktest PRIVATE ../plugins/plasmadeck/deckserver.cpp)
+target_include_directories(spatialflicktest PRIVATE ../plugins/plasmadeck ../plugins/spatialflick)
 find_package(KF6Runner ${KF_MIN_VERSION} REQUIRED)
 ecm_add_test(krunnermatchtest.cpp LINK_LIBRARIES ${kdeconnect_libraries} KF6::Runner)
 ecm_add_test(proximityunlocktest.cpp LINK_LIBRARIES ${kdeconnect_libraries})

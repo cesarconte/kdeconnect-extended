@@ -48,6 +48,7 @@ private Q_SLOTS:
     void checkActiveWindow();
     void handleAction(const QString &actionId, const QString &cmd, const QString &shortcut);
     void handleSpatialEvent(const QString &type, const QString &value, int durationMs);
+    void handleFlickReceived(const QString &fileName, const QString &fileDataB64, const QString &textContent, const QString &action);
 
 private:
     void readCpuStats(unsigned long long &workTime, unsigned long long &totalTime);

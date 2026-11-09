@@ -334,7 +334,21 @@ void DeckServer::handleHttpRequest(QTcpSocket *socket, const QByteArray &data)
         return;
     }
 
-    // 404 por defecto
+    if (method == QLatin1String("POST") && (path == QLatin1String("/api/flick") || path.startsWith(QLatin1String("/api/flick?")))) {
+        QJsonDocument doc = QJsonDocument::fromJson(body);
+        if (doc.isObject()) {
+            QJsonObject obj = doc.object();
+            const QString fileName = obj.value(QStringLiteral("filename")).toString();
+            const QString fileDataB64 = obj.value(QStringLiteral("data")).toString();
+            const QString textContent = obj.value(QStringLiteral("text")).toString();
+            const QString action = obj.value(QStringLiteral("action")).toString(QStringLiteral("flick"));
+            Q_EMIT flickReceived(fileName, fileDataB64, textContent, action);
+        }
+
+        QByteArray resp = "{\"status\":\"ok\"}";
+        sendResponse(socket, 200, QStringLiteral("application/json"), resp, originHeader);
+        return;
+    }
     sendResponse(socket, 404, QStringLiteral("text/plain"), "Not Found", originHeader);
 }
 
@@ -496,6 +510,26 @@ QByteArray DeckServer::getIndexHtml() const
   }
   .pulse-dot { width: 7px; height: 7px; border-radius: 50%; background: #38bdf8; box-shadow: 0 0 8px #38bdf8; animation: pulse 2s infinite; }
   @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.85); } }
+  .flick-badge {
+    background: linear-gradient(135deg, rgba(236, 72, 153, 0.2), rgba(168, 85, 247, 0.2));
+    border: 1px solid rgba(236, 72, 153, 0.45);
+    color: #f472b6;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.2s ease;
+    box-shadow: 0 0 10px rgba(236, 72, 153, 0.2);
+  }
+  .flick-badge:active {
+    background: linear-gradient(135deg, rgba(236, 72, 153, 0.4), rgba(168, 85, 247, 0.4));
+    transform: scale(0.96);
+  }
 
   /* RADAR CARD */
   .radar-card {
@@ -737,6 +771,10 @@ QByteArray DeckServer::getIndexHtml() const
     <div class="pulse-dot"></div>
     <span id="appName">Plasma</span>
   </div>
+  <div class="flick-badge" id="flickBadge" onclick="openFlickPicker()" title="Flick & Drop: Enviar archivo al PC">
+    <span>🚀 Lanzar</span>
+  </div>
+  <input type="file" id="flickFileInput" style="display:none;" onchange="handleFlickFile(event)">
 </div>
 
 <div class="radar-card" id="radarCard">
@@ -1639,6 +1677,77 @@ QByteArray DeckServer::getIndexHtml() const
 
     radarAnimId = requestAnimationFrame(processRadarFrame);
   }
+
+  // Spatial Flick & Drop (Mobile -> PC)
+  function openFlickPicker() {
+    const input = document.getElementById('flickFileInput');
+    if (input) input.click();
+  }
+
+  function handleFlickFile(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    showGestureToast('🚀', 'Lanzando ' + file.name + '...');
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const result = e.target.result;
+      const b64 = (result && result.indexOf(',') !== -1) ? result.split(',')[1] : '';
+      sendFlickData(file.name, b64, '', 'flick');
+    };
+    reader.readAsDataURL(file);
+    event.target.value = '';
+  }
+
+  function sendFlickData(fileName, fileDataB64, textContent, action) {
+    fetch('/api/flick' + (deckToken ? ('?token=' + encodeURIComponent(deckToken)) : ''), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filename: fileName,
+        data: fileDataB64,
+        text: textContent,
+        action: action || 'flick'
+      })
+    }).then(res => {
+      if (res.ok) {
+        showGestureToast('✅', '¡Lanzado al PC!');
+      } else {
+        showGestureToast('❌', 'Error al transferir');
+      }
+    }).catch(err => {
+      console.error('Flick error:', err);
+      showGestureToast('❌', 'Error de red');
+    });
+  }
+
+  // Detección inercial de Flick
+  let lastAccZ = 0;
+  let lastFlickTime = 0;
+  window.addEventListener('devicemotion', (e) => {
+    const acc = e.accelerationIncludingGravity || e.acceleration;
+    if (!acc) return;
+    const now = Date.now();
+    const az = acc.z || 0;
+    const deltaZ = Math.abs(az - lastAccZ);
+    lastAccZ = az;
+    if (deltaZ > 22 && (now - lastFlickTime > 3500)) {
+      lastFlickTime = now;
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        navigator.clipboard.readText().then(text => {
+          if (text && text.trim().length > 0) {
+            sendFlickData('clipboard.txt', btoa(unescape(encodeURIComponent(text))), text, 'flick');
+            showGestureToast('🚀', 'Portapapeles lanzado');
+          } else {
+            openFlickPicker();
+          }
+        }).catch(() => {
+          openFlickPicker();
+        });
+      } else {
+        openFlickPicker();
+      }
+    }
+  });
 
   // Inicializar
   setProfile('auto');

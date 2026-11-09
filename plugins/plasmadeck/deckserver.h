@@ -40,6 +40,7 @@ public:
 Q_SIGNALS:
     void actionTriggered(const QString &actionId, const QString &command, const QString &shortcut);
     void spatialEventReceived(const QString &type, const QString &stateOrGesture, int durationMs);
+    void flickReceived(const QString &fileName, const QString &fileDataB64, const QString &textContent, const QString &action);
 
 private Q_SLOTS:
     void onNewConnection();

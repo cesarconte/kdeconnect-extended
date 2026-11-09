@@ -14,4 +14,5 @@ target_link_libraries(krunner_kdeconnect
     kdeconnectdbusinterfaces
     Qt::DBus
     Qt::Core
+    Qt::Gui
 )

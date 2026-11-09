@@ -46,6 +46,7 @@ PlasmaDeckPlugin::PlasmaDeckPlugin(QObject *parent, const QVariantList &args)
 
     connect(&m_server, &DeckServer::actionTriggered, this, &PlasmaDeckPlugin::handleAction);
     connect(&m_server, &DeckServer::spatialEventReceived, this, &PlasmaDeckPlugin::handleSpatialEvent);
+    connect(&m_server, &DeckServer::flickReceived, this, &PlasmaDeckPlugin::handleFlickReceived);
 
     connect(&m_telemetryTimer, &QTimer::timeout, this, &PlasmaDeckPlugin::updateTelemetry);
     connect(&m_windowPollTimer, &QTimer::timeout, this, &PlasmaDeckPlugin::checkActiveWindow);
@@ -649,6 +650,47 @@ void PlasmaDeckPlugin::handleSpatialEvent(const QString &type, const QString &va
                     solid.call(QDBus::NoBlock, QStringLiteral("setBrightnessSilent"), 7000);
                 }
             }
+        }
+    }
+}
+
+void PlasmaDeckPlugin::handleFlickReceived(const QString &fileName, const QString &fileDataB64, const QString &textContent, const QString &action)
+{
+    Q_UNUSED(action)
+    if (!device()) {
+        return;
+    }
+
+    QString savedPath;
+    if (!fileDataB64.isEmpty()) {
+        const QString cleanName = fileName.isEmpty() ? QStringLiteral("flick_%1.bin").arg(QDateTime::currentMSecsSinceEpoch()) : QFileInfo(fileName).fileName();
+        savedPath = QDir::homePath() + QStringLiteral("/Downloads/") + cleanName;
+
+        QByteArray data = QByteArray::fromBase64(fileDataB64.toUtf8());
+        QFile f(savedPath);
+        if (f.open(QIODevice::WriteOnly)) {
+            f.write(data);
+            f.close();
+        }
+    } else if (!textContent.isEmpty()) {
+        QDBusInterface clipboard(QStringLiteral("org.kde.klipper"),
+                                 QStringLiteral("/klipper"),
+                                 QStringLiteral("org.kde.klipper.klipper"),
+                                 QDBusConnection::sessionBus());
+        if (clipboard.isValid()) {
+            clipboard.call(QDBus::NoBlock, QStringLiteral("setClipboardContents"), textContent);
+        }
+    }
+
+    if (!savedPath.isEmpty()) {
+        QDBusInterface flickIface(QStringLiteral("org.kde.kdeconnect"),
+                                  QStringLiteral("/modules/kdeconnect/devices/%1/spatialflick").arg(device()->id()),
+                                  QStringLiteral("org.kde.kdeconnect.device.spatialflick"),
+                                  QDBusConnection::sessionBus());
+        if (flickIface.isValid()) {
+            flickIface.call(QDBus::NoBlock, QStringLiteral("handleFlickReceived"), savedPath);
+        } else {
+            QProcess::startDetached(QStringLiteral("dolphin"), {QStringLiteral("--select"), savedPath});
         }
     }
 }

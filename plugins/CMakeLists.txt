@@ -59,6 +59,7 @@ if(NOT APPLE AND NOT WIN32)
     add_subdirectory(plasmadeck)
     add_subdirectory(panicshield)
     add_subdirectory(spatialpresence)
+    add_subdirectory(spatialflick)
 endif()
 
 # If we split notifications per plugin, in several notifyrc files, they won't

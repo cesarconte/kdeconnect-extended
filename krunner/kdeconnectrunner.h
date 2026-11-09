@@ -22,5 +22,7 @@ public:
     void run(const KRunner::RunnerContext &context, const KRunner::QueryMatch &match) override;
 
 private:
+    void searchRemoteFiles(KRunner::RunnerContext &context, const QString &deviceId, const QString &devName, const QString &searchTerm);
+
     QList<KRunner::Action> m_actions;
 };

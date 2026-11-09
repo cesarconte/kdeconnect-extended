@@ -1,0 +1,29 @@
+{
+    "$schema": "../kdeconnect.schema.json",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "yugurta@gmail.com",
+                "Name": "Cesar"
+            }
+        ],
+        "Description": "Spatial Flick & Drop: Drag files towards the screen edge to transfer instantly to your mobile phone, and receive flicked content into active windows",
+        "Description[es]": "Spatial Flick & Drop: Arrastra archivos hacia el borde de la pantalla para transferirlos al teléfono al instante, y recibe contenido lanzado en la ventana activa",
+        "EnabledByDefault": true,
+        "Icon": "network-workgroup",
+        "License": "GPL",
+        "Name": "Spatial Flick & Drop",
+        "Name[es]": "Spatial Flick & Drop (Transferencia Direccional)",
+        "ServiceTypes": [
+            "KdeConnect/Plugin"
+        ],
+        "Version": "1.0"
+    },
+    "X-KdeConnect-OutgoingPacketType": [
+        "kdeconnect.ping",
+        "kdeconnect.spatialflick"
+    ],
+    "X-KdeConnect-SupportedPacketType": [
+        "kdeconnect.spatialflick"
+    ]
+}
