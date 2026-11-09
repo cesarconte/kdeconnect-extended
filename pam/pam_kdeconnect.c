@@ -156,8 +156,30 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
         service = (const char *)service_item;
     }
 
-    char req[512];
-    snprintf(req, sizeof(req), "{\"action\":\"authenticate\",\"user\":\"%s\",\"service\":\"%s\"}\n", actual_user ? actual_user : "user", service);
+    const char *sudo_command = getenv("SUDO_COMMAND");
+    char req[1024];
+    if (sudo_command && *sudo_command) {
+        // Sanitizar el comando para formato JSON seguro
+        char sanitized_cmd[256];
+        size_t c = 0;
+        for (size_t i = 0; sudo_command[i] && c < sizeof(sanitized_cmd) - 1; ++i) {
+            if (sudo_command[i] == '"' || sudo_command[i] == '\\') {
+                sanitized_cmd[c++] = '\'';
+            } else if ((unsigned char)sudo_command[i] >= 32) {
+                sanitized_cmd[c++] = sudo_command[i];
+            }
+        }
+        sanitized_cmd[c] = '\0';
+
+        snprintf(req,
+                 sizeof(req),
+                 "{\"action\":\"authenticate\",\"user\":\"%s\",\"service\":\"%s\",\"command\":\"%s\"}\n",
+                 actual_user ? actual_user : "user",
+                 service,
+                 sanitized_cmd);
+    } else {
+        snprintf(req, sizeof(req), "{\"action\":\"authenticate\",\"user\":\"%s\",\"service\":\"%s\"}\n", actual_user ? actual_user : "user", service);
+    }
     if (write(fd, req, strlen(req)) <= 0) {
         close(fd);
         return PAM_IGNORE;

@@ -23,6 +23,10 @@ class BiometricAuthPlugin : public KdeConnectPlugin
     Q_CLASSINFO("D-Bus Interface", "org.kde.kdeconnect.device.biometricauth")
     Q_PROPERTY(bool isPending READ isPending NOTIFY pendingChanged)
     Q_PROPERTY(QString lastPrompt READ lastPrompt NOTIFY pendingChanged)
+    Q_PROPERTY(QString currentCommand READ currentCommand NOTIFY pendingChanged)
+    Q_PROPERTY(QString currentService READ currentService NOTIFY pendingChanged)
+    Q_PROPERTY(QString currentRiskLevel READ currentRiskLevel NOTIFY pendingChanged)
+    Q_PROPERTY(QString currentTransactionId READ currentTransactionId NOTIFY pendingChanged)
 
 public:
     BiometricAuthPlugin(QObject *parent, const QVariantList &args);
@@ -30,10 +34,15 @@ public:
 
     bool isPending() const;
     QString lastPrompt() const;
+    QString currentCommand() const;
+    QString currentService() const;
+    QString currentRiskLevel() const;
+    QString currentTransactionId() const;
 
     Q_SCRIPTABLE void respondBiometric(bool accepted);
     Q_SCRIPTABLE void cancelBiometric();
     Q_SCRIPTABLE void requestBiometric(const QString &service);
+    Q_SCRIPTABLE QString requestAuthorization(const QString &service, const QString &command, const QString &riskLevel = QStringLiteral("medium"));
 
     void receivePacket(const NetworkPacket &np) override;
     QString dbusPath() const override;
@@ -41,6 +50,7 @@ public:
 Q_SIGNALS:
     Q_SCRIPTABLE void pendingChanged();
     Q_SCRIPTABLE void authenticationFinished(bool success);
+    Q_SCRIPTABLE void authRequested(const QString &transactionId, const QString &service, const QString &command, const QString &riskLevel);
 
 private Q_SLOTS:
     void handleNewConnection();
@@ -50,7 +60,8 @@ private Q_SLOTS:
 private:
     void setupSocketServer();
     void sendResponseToPam(const QString &status, const QString &message = QString());
-    void notifyDesktop(const QString &service);
+    void notifyDesktop(const QString &service, const QString &command, const QString &riskLevel);
+    QString calculateRiskLevel(const QString &command) const;
 
     QLocalServer *m_server = nullptr;
     QLocalSocket *m_currentSocket = nullptr;
@@ -59,4 +70,7 @@ private:
     bool m_isPending = false;
     QString m_lastPrompt;
     QString m_currentTransactionId;
+    QString m_currentCommand;
+    QString m_currentService;
+    QString m_currentRiskLevel;
 };

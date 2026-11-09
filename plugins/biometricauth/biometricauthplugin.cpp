@@ -50,6 +50,41 @@ QString BiometricAuthPlugin::lastPrompt() const
     return m_lastPrompt;
 }
 
+QString BiometricAuthPlugin::currentCommand() const
+{
+    return m_currentCommand;
+}
+
+QString BiometricAuthPlugin::currentService() const
+{
+    return m_currentService;
+}
+
+QString BiometricAuthPlugin::currentRiskLevel() const
+{
+    return m_currentRiskLevel;
+}
+
+QString BiometricAuthPlugin::currentTransactionId() const
+{
+    return m_currentTransactionId;
+}
+
+QString BiometricAuthPlugin::calculateRiskLevel(const QString &command) const
+{
+    const QString cmd = command.toLower().trimmed();
+    if (cmd.contains(QLatin1String("dd ")) || cmd.contains(QLatin1String("mkfs")) || cmd.contains(QLatin1String("fdisk"))
+        || cmd.contains(QLatin1String("parted")) || cmd.contains(QLatin1String("wipefs")) || cmd.contains(QLatin1String("rm -rf"))
+        || cmd.contains(QLatin1String("shred")) || cmd.contains(QLatin1String("format"))) {
+        return QStringLiteral("critical");
+    }
+    if (cmd.contains(QLatin1String("pacman -r")) || cmd.contains(QLatin1String("apt remove")) || cmd.contains(QLatin1String("systemctl stop"))
+        || cmd.contains(QLatin1String("reboot")) || cmd.contains(QLatin1String("poweroff")) || cmd.contains(QLatin1String("shutdown"))) {
+        return QStringLiteral("high");
+    }
+    return QStringLiteral("medium");
+}
+
 void BiometricAuthPlugin::setupSocketServer()
 {
     if (m_server) {
@@ -121,8 +156,13 @@ void BiometricAuthPlugin::handleSocketData()
     const QString action = obj.value(QStringLiteral("action")).toString();
     const QString user = obj.value(QStringLiteral("user")).toString();
     const QString service = obj.value(QStringLiteral("service")).toString(QStringLiteral("sudo"));
+    const QString command = obj.value(QStringLiteral("command")).toString();
+    QString risk = obj.value(QStringLiteral("riskLevel")).toString();
+    if (risk.isEmpty()) {
+        risk = calculateRiskLevel(command);
+    }
 
-    if (action != QLatin1String("authenticate")) {
+    if (action != QLatin1String("authenticate") && action != QLatin1String("authorize") && action != QLatin1String("dualkey")) {
         sendResponseToPam(QStringLiteral("error"), QStringLiteral("Acción no válida"));
         return;
     }
@@ -134,17 +174,27 @@ void BiometricAuthPlugin::handleSocketData()
     }
 
     m_currentTransactionId = QUuid::createUuid().toString(QUuid::WithoutBraces);
-    m_lastPrompt = i18n("Autenticación requerida para %1 (%2)", user, service);
+    m_currentCommand = command;
+    m_currentService = service;
+    m_currentRiskLevel = risk;
     m_isPending = true;
 
-    // Notificar al módulo PAM que estamos esperando confirmación en el móvil
+    if (!m_currentCommand.isEmpty()) {
+        m_lastPrompt = i18n("🔑 Dual-Key: Se requiere autorización para ejecutar '%1' (%2 - %3)", m_currentCommand, user, service);
+    } else {
+        m_lastPrompt = i18n("Autenticación requerida para %1 (%2)", user, service);
+    }
+
+    // Notificar al cliente socket que estamos esperando confirmación en el móvil
     sendResponseToPam(QStringLiteral("prompt"), m_lastPrompt);
 
-    // Enviar paquete de autenticación biométrica al móvil
+    // Enviar paquete de autenticación biométrica y dual-key al móvil
     NetworkPacket req(PACKET_TYPE_BIOMETRIC_REQUEST);
     req.set(QStringLiteral("transactionId"), m_currentTransactionId);
     req.set(QStringLiteral("user"), user);
     req.set(QStringLiteral("service"), service);
+    req.set(QStringLiteral("command"), m_currentCommand);
+    req.set(QStringLiteral("riskLevel"), m_currentRiskLevel);
     req.set(QStringLiteral("hostname"), QHostInfo::localHostName());
     req.set<qint64>(QStringLiteral("timestamp"), QDateTime::currentMSecsSinceEpoch());
     sendPacket(req);
@@ -154,13 +204,14 @@ void BiometricAuthPlugin::handleSocketData()
     sendPacket(ping);
 
     // Mostrar aviso en el escritorio
-    notifyDesktop(service);
+    notifyDesktop(service, m_currentCommand, m_currentRiskLevel);
 
     // Iniciar tiempo límite de 25 segundos
     m_timeoutTimer.stop();
     m_timeoutTimer.start(25000);
 
     Q_EMIT pendingChanged();
+    Q_EMIT authRequested(m_currentTransactionId, service, m_currentCommand, m_currentRiskLevel);
 }
 
 void BiometricAuthPlugin::sendResponseToPam(const QString &status, const QString &message)
@@ -184,13 +235,19 @@ void BiometricAuthPlugin::sendResponseToPam(const QString &status, const QString
     }
 }
 
-void BiometricAuthPlugin::notifyDesktop(const QString &service)
+void BiometricAuthPlugin::notifyDesktop(const QString &service, const QString &command, const QString &riskLevel)
 {
     auto *notif = new KNotification(QStringLiteral("notification"), KNotification::CloseOnTimeout);
-    notif->setIconName(QStringLiteral("security-high"));
+    notif->setIconName(riskLevel == QLatin1String("critical") ? QStringLiteral("security-low") : QStringLiteral("security-high"));
     notif->setComponentName(QStringLiteral("kdeconnect"));
-    notif->setTitle(i18n("Autenticación solicitada"));
-    notif->setText(i18n("Solicitud de %1: esperando confirmación en %2", service, device()->name()));
+
+    if (!command.isEmpty()) {
+        notif->setTitle(i18n("🔑 Dual-Key: Autorización Requerida"));
+        notif->setText(i18n("Comando: %1\nServicio: %2 [%3]\nEsperando confirmación en %4...", command, service, riskLevel.toUpper(), device()->name()));
+    } else {
+        notif->setTitle(i18n("Autenticación solicitada"));
+        notif->setText(i18n("Solicitud de %1: esperando confirmación en %2", service, device()->name()));
+    }
 
     auto *approveAction = notif->addAction(i18n("Aprobar"));
     connect(approveAction, &KNotificationAction::activated, this, [this, notif] {
@@ -216,6 +273,12 @@ void BiometricAuthPlugin::handleAuthTimeout()
     m_isPending = false;
     sendResponseToPam(QStringLiteral("timeout"), i18n("Tiempo límite de autenticación agotado"));
     Q_EMIT authenticationFinished(false);
+
+    m_currentCommand.clear();
+    m_currentService.clear();
+    m_currentRiskLevel.clear();
+    m_currentTransactionId.clear();
+
     Q_EMIT pendingChanged();
 }
 
@@ -236,6 +299,11 @@ void BiometricAuthPlugin::respondBiometric(bool accepted)
         Q_EMIT authenticationFinished(false);
     }
 
+    m_currentCommand.clear();
+    m_currentService.clear();
+    m_currentRiskLevel.clear();
+    m_currentTransactionId.clear();
+
     Q_EMIT pendingChanged();
 }
 
@@ -246,7 +314,49 @@ void BiometricAuthPlugin::cancelBiometric()
 
 void BiometricAuthPlugin::requestBiometric(const QString &service)
 {
-    Q_UNUSED(service);
+    requestAuthorization(service, QString(), QStringLiteral("medium"));
+}
+
+QString BiometricAuthPlugin::requestAuthorization(const QString &service, const QString &command, const QString &riskLevel)
+{
+    if (!device()->isReachable()) {
+        return QString();
+    }
+
+    m_currentTransactionId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    m_currentCommand = command;
+    m_currentService = service;
+    m_currentRiskLevel = riskLevel.isEmpty() ? calculateRiskLevel(command) : riskLevel;
+    m_isPending = true;
+
+    if (!m_currentCommand.isEmpty()) {
+        m_lastPrompt = i18n("🔑 Dual-Key: Se requiere autorización para '%1' (%2)", m_currentCommand, service);
+    } else {
+        m_lastPrompt = i18n("Autenticación requerida para %1", service);
+    }
+
+    NetworkPacket req(PACKET_TYPE_BIOMETRIC_REQUEST);
+    req.set(QStringLiteral("transactionId"), m_currentTransactionId);
+    req.set(QStringLiteral("user"), QString::fromLocal8Bit(qgetenv("USER")));
+    req.set(QStringLiteral("service"), service);
+    req.set(QStringLiteral("command"), m_currentCommand);
+    req.set(QStringLiteral("riskLevel"), m_currentRiskLevel);
+    req.set(QStringLiteral("hostname"), QHostInfo::localHostName());
+    req.set<qint64>(QStringLiteral("timestamp"), QDateTime::currentMSecsSinceEpoch());
+    sendPacket(req);
+
+    NetworkPacket ping(PACKET_TYPE_PING);
+    sendPacket(ping);
+
+    notifyDesktop(service, m_currentCommand, m_currentRiskLevel);
+
+    m_timeoutTimer.stop();
+    m_timeoutTimer.start(25000);
+
+    Q_EMIT pendingChanged();
+    Q_EMIT authRequested(m_currentTransactionId, service, m_currentCommand, m_currentRiskLevel);
+
+    return m_currentTransactionId;
 }
 
 void BiometricAuthPlugin::receivePacket(const NetworkPacket &np)
