@@ -312,6 +312,28 @@ void DeckServer::handleHttpRequest(QTcpSocket *socket, const QByteArray &data)
         return;
     }
 
+    if (method == QLatin1String("POST") && (path == QLatin1String("/api/spatial") || path.startsWith(QLatin1String("/api/spatial?")))) {
+        QJsonDocument doc = QJsonDocument::fromJson(body);
+        if (doc.isObject()) {
+            QJsonObject obj = doc.object();
+            const QString type = obj.value(QStringLiteral("type")).toString();
+            QString val = obj.value(QStringLiteral("value")).toString();
+            if (val.isEmpty()) {
+                val = obj.value(QStringLiteral("gesture")).toString();
+            }
+            if (val.isEmpty()) {
+                val = obj.value(QStringLiteral("state")).toString();
+            }
+            const int durationMs = obj.contains(QStringLiteral("durationMs")) ? obj.value(QStringLiteral("durationMs")).toInt()
+                                                                              : obj.value(QStringLiteral("duration_ms")).toInt(0);
+            Q_EMIT spatialEventReceived(type, val, durationMs);
+        }
+
+        QByteArray resp = "{\"status\":\"ok\"}";
+        sendResponse(socket, 200, QStringLiteral("application/json"), resp, originHeader);
+        return;
+    }
+
     // 404 por defecto
     sendResponse(socket, 404, QStringLiteral("text/plain"), "Not Found", originHeader);
 }
@@ -472,6 +494,117 @@ QByteArray DeckServer::getIndexHtml() const
   .pulse-dot { width: 7px; height: 7px; border-radius: 50%; background: #38bdf8; box-shadow: 0 0 8px #38bdf8; animation: pulse 2s infinite; }
   @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.85); } }
 
+  /* RADAR CARD */
+  .radar-card {
+    background: rgba(22, 22, 34, 0.78);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 10px 14px;
+    margin-bottom: 14px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+    transition: all 0.2s ease;
+  }
+  .radar-card.active {
+    border-color: rgba(56, 189, 248, 0.4);
+    box-shadow: 0 0 20px rgba(56, 189, 248, 0.15);
+  }
+  .radar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .radar-info { display: flex; flex-direction: column; gap: 2px; }
+  .radar-status-line { display: flex; align-items: center; gap: 8px; }
+  .radar-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #64748b;
+    transition: all 0.2s ease;
+  }
+  .radar-dot.present { background: #4ade80; box-shadow: 0 0 8px #4ade80; }
+  .radar-dot.absent { background: #facc15; box-shadow: 0 0 8px #facc15; }
+  .radar-dot.locked { background: #f87171; box-shadow: 0 0 8px #f87171; }
+  .radar-dot.gesture { background: #38bdf8; box-shadow: 0 0 12px #38bdf8; transform: scale(1.3); }
+
+  .radar-title { font-size: 13px; font-weight: 700; color: #f0f0f5; letter-spacing: -0.2px; }
+  .radar-sub { font-size: 10px; color: #8e8e9f; }
+
+  /* SWITCH TOGGLE */
+  .switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+  }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #2e2e42;
+    transition: .3s;
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 2px;
+    bottom: 2px;
+    background-color: #8e8e9f;
+    transition: .3s;
+    border-radius: 50%;
+  }
+  input:checked + .slider { background-color: rgba(56, 189, 248, 0.35); border-color: #38bdf8; }
+  input:checked + .slider:before { transform: translateX(20px); background-color: #38bdf8; box-shadow: 0 0 8px #38bdf8; }
+
+  .radar-details {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .radar-preview-wrap { position: relative; width: 80px; height: 60px; border-radius: 10px; overflow: hidden; border: 1px solid rgba(56, 189, 248, 0.3); flex-shrink: 0; }
+  .radar-canvas-view { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+  .radar-feed-status { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: #cbd5e1; }
+  .feed-item b { color: #f0f0f5; }
+
+  /* GESTURE TOAST NOTIFICATION */
+  .gesture-toast {
+    position: fixed;
+    top: 40%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.8);
+    background: rgba(18, 18, 28, 0.92);
+    border: 1px solid rgba(56, 189, 248, 0.5);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7), 0 0 20px rgba(56, 189, 248, 0.3);
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px);
+    padding: 18px 26px;
+    border-radius: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    pointer-events: none;
+    opacity: 0;
+    transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    z-index: 9999;
+  }
+  .gesture-toast.show {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  .gesture-icon { font-size: 38px; filter: drop-shadow(0 2px 8px rgba(56,189,248,0.5)); }
+  .gesture-label { font-size: 14px; font-weight: 700; color: #38bdf8; letter-spacing: -0.2px; }
+
   .deck-grid {
     flex: 1;
     display: grid;
@@ -569,6 +702,38 @@ QByteArray DeckServer::getIndexHtml() const
     <div class="pulse-dot"></div>
     <span id="appName">Plasma</span>
   </div>
+</div>
+
+<div class="radar-card" id="radarCard">
+  <div class="radar-header">
+    <div class="radar-info">
+      <div class="radar-status-line">
+        <span class="radar-dot" id="radarDot"></span>
+        <span class="radar-title" id="radarTitle">Sensor Espacial: Inactivo</span>
+      </div>
+      <div class="radar-sub" id="radarSub">Detección de presencia & Gestos en el aire</div>
+    </div>
+    <label class="switch">
+      <input type="checkbox" id="radarSwitch" onchange="toggleOpticalRadar(this.checked)">
+      <span class="slider"></span>
+    </label>
+  </div>
+  <div class="radar-details" id="radarDetails" style="display:none;">
+    <div class="radar-preview-wrap">
+      <canvas id="radarPreview" width="96" height="72" class="radar-canvas-view"></canvas>
+      <video id="radarVideo" playsinline muted autoplay style="display:none;"></video>
+      <canvas id="radarWorkerCanvas" width="160" height="120" style="display:none;"></canvas>
+    </div>
+    <div class="radar-feed-status">
+      <div class="feed-item" id="feedPresence">👁️ <b>Presencia:</b> Buscando usuario...</div>
+      <div class="feed-item" id="feedGesture">🖐️ <b>Gestos:</b> Listos (⬅️ ➡️ 🖐️ ⬆️ ⬇️)</div>
+    </div>
+  </div>
+</div>
+
+<div class="gesture-toast" id="gestureToast">
+  <div class="gesture-icon" id="gestureToastIcon">➡️</div>
+  <div class="gesture-label" id="gestureToastText">Siguiente Escritorio</div>
 </div>
 
 <div class="deck-grid" id="deckGrid">
@@ -741,6 +906,356 @@ QByteArray DeckServer::getIndexHtml() const
     es.onerror = () => {
       setTimeout(connectSSE, 3000);
     };
+  }
+
+  // ==========================================
+  // SPATIAL RADAR & TOUCHLESS OPTICAL ENGINE
+  // ==========================================
+  let radarStream = null;
+  let radarRunning = false;
+  let radarAnimId = null;
+  let prevGray = null;
+  let gestureState = 'idle';
+  let gestureStartTime = 0;
+  let cooldownUntil = 0;
+  let palmCoverStartTime = 0;
+  let lastPresentTime = Date.now();
+  let presenceState = 'present';
+  let faceDetector = null;
+
+  if ('FaceDetector' in window) {
+    try {
+      faceDetector = new FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
+    } catch(e) {
+      faceDetector = null;
+    }
+  }
+
+  function toggleOpticalRadar(enable) {
+    if (enable) {
+      startOpticalRadar();
+    } else {
+      stopOpticalRadar();
+    }
+  }
+
+  async function startOpticalRadar() {
+    try {
+      const constraints = {
+        video: {
+          facingMode: 'user',
+          width: { ideal: 320 },
+          height: { ideal: 240 }
+        },
+        audio: false
+      };
+      radarStream = await navigator.mediaDevices.getUserMedia(constraints);
+      const video = document.getElementById('radarVideo');
+      video.srcObject = radarStream;
+      await video.play();
+
+      radarRunning = true;
+      document.getElementById('radarCard').classList.add('active');
+      document.getElementById('radarDetails').style.display = 'flex';
+      document.getElementById('radarTitle').textContent = 'Sensor Espacial: Activo';
+      document.getElementById('radarSub').textContent = 'Monitorizando presencia y gestos en el aire';
+      lastPresentTime = Date.now();
+      presenceState = 'present';
+      updateRadarPresenceUI('present', 'Atento / Presente');
+
+      processRadarFrame();
+    } catch (err) {
+      console.error('Error starting camera radar:', err);
+      document.getElementById('radarSwitch').checked = false;
+      alert('No se pudo acceder a la cámara frontal para el Sensor Espacial: ' + err.message);
+    }
+  }
+
+  function stopOpticalRadar() {
+    radarRunning = false;
+    if (radarAnimId) {
+      cancelAnimationFrame(radarAnimId);
+      radarAnimId = null;
+    }
+    if (radarStream) {
+      radarStream.getTracks().forEach(t => t.stop());
+      radarStream = null;
+    }
+    document.getElementById('radarCard').classList.remove('active');
+    document.getElementById('radarDetails').style.display = 'none';
+    document.getElementById('radarTitle').textContent = 'Sensor Espacial: Inactivo';
+    document.getElementById('radarSub').textContent = 'Detección de presencia & Gestos en el aire';
+    setRadarDot('idle');
+  }
+
+  function setRadarDot(state) {
+    const dot = document.getElementById('radarDot');
+    dot.className = 'radar-dot ' + state;
+  }
+
+  function updateRadarPresenceUI(state, text) {
+    setRadarDot(state);
+    const feed = document.getElementById('feedPresence');
+    if (state === 'present') {
+      feed.innerHTML = '👁️ <b>Presencia:</b> <span style="color:#4ade80">' + text + '</span>';
+    } else if (state === 'absent') {
+      feed.innerHTML = '🟡 <b>Presencia:</b> <span style="color:#facc15">' + text + '</span>';
+    } else if (state === 'locked') {
+      feed.innerHTML = '🔴 <b>Presencia:</b> <span style="color:#f87171">' + text + '</span>';
+    }
+  }
+
+  function showGestureToast(icon, text) {
+    const toast = document.getElementById('gestureToast');
+    document.getElementById('gestureToastIcon').textContent = icon;
+    document.getElementById('gestureToastText').textContent = text;
+    toast.classList.add('show');
+    if (navigator.vibrate) {
+      navigator.vibrate(45);
+    }
+    setRadarDot('gesture');
+    setTimeout(() => {
+      toast.classList.remove('show');
+      setRadarDot(presenceState);
+    }, 900);
+  }
+
+  function sendSpatialEvent(type, val, durationMs) {
+    const payload = {
+      type: type,
+      value: val,
+      gesture: val,
+      state: val,
+      durationMs: durationMs || 0,
+      token: deckToken
+    };
+    fetch('/api/spatial' + (deckToken ? ('?token=' + encodeURIComponent(deckToken)) : ''), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Deck-Token': deckToken
+      },
+      body: JSON.stringify(payload)
+    }).catch(e => console.error(e));
+  }
+
+  let lastFrameTime = 0;
+  const FRAME_INTERVAL = 50; // ~20 FPS
+
+  async function processRadarFrame() {
+    if (!radarRunning) return;
+
+    const now = Date.now();
+    if (now - lastFrameTime < FRAME_INTERVAL) {
+      radarAnimId = requestAnimationFrame(processRadarFrame);
+      return;
+    }
+    lastFrameTime = now;
+
+    const video = document.getElementById('radarVideo');
+    const workerCanvas = document.getElementById('radarWorkerCanvas');
+    const previewCanvas = document.getElementById('radarPreview');
+
+    if (!video.videoWidth || !video.videoHeight) {
+      radarAnimId = requestAnimationFrame(processRadarFrame);
+      return;
+    }
+
+    const w = 160;
+    const h = 120;
+    const ctx = workerCanvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(video, 0, 0, w, h);
+
+    const imgData = ctx.getImageData(0, 0, w, h);
+    const data = imgData.data;
+
+    // Mini preview render
+    const prevCtx = previewCanvas.getContext('2d');
+    prevCtx.drawImage(workerCanvas, 0, 0, previewCanvas.width, previewCanvas.height);
+
+    // 1. Detección Óptica de Presencia / Rostro (YCbCr + Gradiente)
+    let skinPixels = 0;
+    let sumLuma = 0;
+    let motionLeft = 0;
+    let motionCenter = 0;
+    let motionRight = 0;
+    let motionTop = 0;
+    let motionBottom = 0;
+
+    const currentGray = new Uint8Array(w * h);
+
+    for (let y = 0; y < h; y += 2) {
+      for (let x = 0; x < w; x += 2) {
+        const idx = (y * w + x) * 4;
+        const r = data[idx];
+        const g = data[idx + 1];
+        const b = data[idx + 2];
+
+        // Luma
+        const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+        sumLuma += luma;
+        currentGray[y * w + x] = luma;
+
+        // YCbCr skin tone detection
+        const cb = 128 - 0.168736 * r - 0.331264 * g + 0.500 * b;
+        const cr = 128 + 0.500 * r - 0.418688 * g - 0.081312 * b;
+
+        if (luma > 35 && luma < 240 && cb >= 77 && cb <= 127 && cr >= 133 && cr <= 173) {
+          if (y < h * 0.8 && x > w * 0.15 && x < w * 0.85) {
+            skinPixels++;
+          }
+        }
+
+        // Motion differencing
+        if (prevGray) {
+          const diff = Math.abs(luma - prevGray[y * w + x]);
+          if (diff > 22) {
+            if (x < 54) motionLeft += diff;
+            else if (x < 107) motionCenter += diff;
+            else motionRight += diff;
+
+            if (y < 60) motionTop += diff;
+            else motionBottom += diff;
+          }
+        }
+      }
+    }
+
+    prevGray = currentGray;
+    const totalSampled = (w / 2) * (h / 2);
+    const avgLuma = sumLuma / totalSampled;
+
+    // FaceDetector API check if available
+    let facePresent = skinPixels > 90;
+    if (faceDetector && !facePresent) {
+      try {
+        const detected = await faceDetector.detect(video);
+        if (detected.length > 0) facePresent = true;
+      } catch(e) {}
+    }
+
+    // Evaluación de Presencia
+    if (facePresent) {
+      lastPresentTime = now;
+      if (presenceState !== 'present') {
+        presenceState = 'present';
+        sendSpatialEvent('presence', 'present', 0);
+        updateRadarPresenceUI('present', 'Atento / Presente');
+      }
+    } else {
+      const absentDuration = now - lastPresentTime;
+      if (absentDuration >= 60000) {
+        if (presenceState !== 'locked') {
+          presenceState = 'locked';
+          sendSpatialEvent('presence', 'absent', absentDuration);
+          updateRadarPresenceUI('locked', 'Ausente >60s (Sesión bloqueada)');
+        }
+      } else if (absentDuration >= 15000) {
+        if (presenceState !== 'absent') {
+          presenceState = 'absent';
+          sendSpatialEvent('presence', 'absent', absentDuration);
+          updateRadarPresenceUI('absent', 'Ausente >15s (Atenuando pantalla)');
+        }
+      }
+    }
+
+    // 2. Detección Óptica de Gestos en el Aire (Air Gestures)
+    if (now > cooldownUntil) {
+      const eLeft = motionLeft / 400;
+      const eCenter = motionCenter / 400;
+      const eRight = motionRight / 400;
+      const eTop = motionTop / 500;
+      const eBottom = motionBottom / 500;
+
+      // Gesto de Palma / Cubrir Cámara -> Mute Micrófono
+      if (avgLuma < 22 || (skinPixels > totalSampled * 0.45 && eCenter < 5)) {
+        if (!palmCoverStartTime) {
+          palmCoverStartTime = now;
+        } else if (now - palmCoverStartTime > 650) {
+          showGestureToast('🎙️', 'Silenciar Micrófono');
+          document.getElementById('feedGesture').innerHTML = '🖐️ <b>Gesto:</b> <span style="color:#38bdf8">🎙️ Palma Mute</span>';
+          sendSpatialEvent('gesture', 'palm_hold');
+          palmCoverStartTime = 0;
+          cooldownUntil = now + 1400;
+          gestureState = 'idle';
+        }
+      } else {
+        palmCoverStartTime = 0;
+
+        // Gestos Direccionales Wave
+        const GESTURE_THRESH = 14;
+
+        if (gestureState === 'idle') {
+          if (eLeft > GESTURE_THRESH && eRight < 6) {
+            gestureState = 'from_left';
+            gestureStartTime = now;
+          } else if (eRight > GESTURE_THRESH && eLeft < 6) {
+            gestureState = 'from_right';
+            gestureStartTime = now;
+          } else if (eBottom > 16 && eTop < 6) {
+            gestureState = 'from_bottom';
+            gestureStartTime = now;
+          } else if (eTop > 16 && eBottom < 6) {
+            gestureState = 'from_top';
+            gestureStartTime = now;
+          }
+        } else if (gestureState === 'from_left') {
+          if (eCenter > GESTURE_THRESH && (now - gestureStartTime) < 550) {
+            gestureState = 'from_left_mid';
+          } else if ((now - gestureStartTime) > 650) {
+            gestureState = 'idle';
+          }
+        } else if (gestureState === 'from_left_mid') {
+          if (eRight > GESTURE_THRESH && (now - gestureStartTime) < 850) {
+            showGestureToast('➡️', 'Siguiente Escritorio');
+            document.getElementById('feedGesture').innerHTML = '🖐️ <b>Gesto:</b> <span style="color:#38bdf8">➡️ Ola Derecha</span>';
+            sendSpatialEvent('gesture', 'wave_right');
+            gestureState = 'idle';
+            cooldownUntil = now + 650;
+          } else if ((now - gestureStartTime) > 900) {
+            gestureState = 'idle';
+          }
+        } else if (gestureState === 'from_right') {
+          if (eCenter > GESTURE_THRESH && (now - gestureStartTime) < 550) {
+            gestureState = 'from_right_mid';
+          } else if ((now - gestureStartTime) > 650) {
+            gestureState = 'idle';
+          }
+        } else if (gestureState === 'from_right_mid') {
+          if (eLeft > GESTURE_THRESH && (now - gestureStartTime) < 850) {
+            showGestureToast('⬅️', 'Escritorio Anterior');
+            document.getElementById('feedGesture').innerHTML = '🖐️ <b>Gesto:</b> <span style="color:#38bdf8">⬅️ Ola Izquierda</span>';
+            sendSpatialEvent('gesture', 'wave_left');
+            gestureState = 'idle';
+            cooldownUntil = now + 650;
+          } else if ((now - gestureStartTime) > 900) {
+            gestureState = 'idle';
+          }
+        } else if (gestureState === 'from_bottom') {
+          if (eTop > 15 && (now - gestureStartTime) < 650) {
+            showGestureToast('🔊', 'Volumen +');
+            document.getElementById('feedGesture').innerHTML = '🖐️ <b>Gesto:</b> <span style="color:#38bdf8">🔊 Ola Arriba</span>';
+            sendSpatialEvent('gesture', 'wave_up');
+            gestureState = 'idle';
+            cooldownUntil = now + 500;
+          } else if ((now - gestureStartTime) > 750) {
+            gestureState = 'idle';
+          }
+        } else if (gestureState === 'from_top') {
+          if (eBottom > 15 && (now - gestureStartTime) < 650) {
+            showGestureToast('🔉', 'Volumen -');
+            document.getElementById('feedGesture').innerHTML = '🖐️ <b>Gesto:</b> <span style="color:#38bdf8">🔉 Ola Abajo</span>';
+            sendSpatialEvent('gesture', 'wave_down');
+            gestureState = 'idle';
+            cooldownUntil = now + 500;
+          } else if ((now - gestureStartTime) > 750) {
+            gestureState = 'idle';
+          }
+        }
+      }
+    }
+
+    radarAnimId = requestAnimationFrame(processRadarFrame);
   }
 
   // Inicializar

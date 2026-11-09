@@ -1,0 +1,29 @@
+{
+    "$schema": "../kdeconnect.schema.json",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "yugurta@gmail.com",
+                "Name": "Cesar"
+            }
+        ],
+        "Description": "Spatial & AI presence: mobile eye-tracking attention dimmer, presence-based lock, and touchless air gestures for virtual desktops and audio",
+        "Description[es]": "Visión y Presencia Espacial Inteligente: atenuador de brillo por atención, bloqueo por ausencia y gestos en el aire sin contacto",
+        "EnabledByDefault": true,
+        "Icon": "camera-web",
+        "License": "GPL",
+        "Name": "Spatial Presence & Air Gestures",
+        "Name[es]": "Visión y Presencia Espacial",
+        "ServiceTypes": [
+            "KdeConnect/Plugin"
+        ],
+        "Version": "1.0"
+    },
+    "X-KdeConnect-OutgoingPacketType": [
+        "kdeconnect.ping",
+        "kdeconnect.spatialpresence"
+    ],
+    "X-KdeConnect-SupportedPacketType": [
+        "kdeconnect.spatialpresence"
+    ]
+}

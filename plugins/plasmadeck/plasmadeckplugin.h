@@ -47,6 +47,7 @@ private Q_SLOTS:
     void updateTelemetry();
     void checkActiveWindow();
     void handleAction(const QString &actionId, const QString &cmd, const QString &shortcut);
+    void handleSpatialEvent(const QString &type, const QString &value, int durationMs);
 
 private:
     void readCpuStats(unsigned long long &workTime, unsigned long long &totalTime);

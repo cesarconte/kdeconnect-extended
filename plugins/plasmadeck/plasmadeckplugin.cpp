@@ -45,6 +45,7 @@ PlasmaDeckPlugin::PlasmaDeckPlugin(QObject *parent, const QVariantList &args)
     }
 
     connect(&m_server, &DeckServer::actionTriggered, this, &PlasmaDeckPlugin::handleAction);
+    connect(&m_server, &DeckServer::spatialEventReceived, this, &PlasmaDeckPlugin::handleSpatialEvent);
 
     connect(&m_telemetryTimer, &QTimer::timeout, this, &PlasmaDeckPlugin::updateTelemetry);
     connect(&m_windowPollTimer, &QTimer::timeout, this, &PlasmaDeckPlugin::checkActiveWindow);
@@ -572,6 +573,60 @@ void PlasmaDeckPlugin::registerRunCommand()
     QJsonDocument doc(json);
     s.setValue(QStringLiteral("commands"), doc.toJson(QJsonDocument::Compact));
     s.sync();
+}
+
+void PlasmaDeckPlugin::handleSpatialEvent(const QString &type, const QString &value, int durationMs)
+{
+    if (!device()) {
+        return;
+    }
+
+    QDBusInterface spatialIface(QStringLiteral("org.kde.kdeconnect"),
+                                QStringLiteral("/modules/kdeconnect/devices/%1/spatialpresence").arg(device()->id()),
+                                QStringLiteral("org.kde.kdeconnect.device.spatialpresence"),
+                                QDBusConnection::sessionBus());
+    if (spatialIface.isValid()) {
+        if (type == QLatin1String("gesture")) {
+            spatialIface.call(QDBus::NoBlock, QStringLiteral("onGestureDetected"), value);
+        } else if (type == QLatin1String("presence")) {
+            spatialIface.call(QDBus::NoBlock, QStringLiteral("onPresenceChanged"), value, durationMs);
+        }
+    } else {
+        // Fallback directo a KWin / KMix si el plugin aún no está conectado al bus
+        if (type == QLatin1String("gesture")) {
+            if (value == QLatin1String("wave_right")) {
+                QDBusInterface kwin(QStringLiteral("org.kde.kglobalaccel"),
+                                    QStringLiteral("/component/kwin"),
+                                    QStringLiteral("org.kde.kglobalaccel.Component"),
+                                    QDBusConnection::sessionBus());
+                kwin.call(QDBus::NoBlock, QStringLiteral("invokeShortcut"), QStringLiteral("Switch One Desktop to the Right"));
+            } else if (value == QLatin1String("wave_left")) {
+                QDBusInterface kwin(QStringLiteral("org.kde.kglobalaccel"),
+                                    QStringLiteral("/component/kwin"),
+                                    QStringLiteral("org.kde.kglobalaccel.Component"),
+                                    QDBusConnection::sessionBus());
+                kwin.call(QDBus::NoBlock, QStringLiteral("invokeShortcut"), QStringLiteral("Switch One Desktop to the Left"));
+            } else if (value == QLatin1String("palm_hold")) {
+                QDBusInterface kmix(QStringLiteral("org.kde.kglobalaccel"),
+                                    QStringLiteral("/component/kmix"),
+                                    QStringLiteral("org.kde.kglobalaccel.Component"),
+                                    QDBusConnection::sessionBus());
+                kmix.call(QDBus::NoBlock, QStringLiteral("invokeShortcut"), QStringLiteral("mic_mute"));
+            } else if (value == QLatin1String("wave_up")) {
+                QDBusInterface kmix(QStringLiteral("org.kde.kglobalaccel"),
+                                    QStringLiteral("/component/kmix"),
+                                    QStringLiteral("org.kde.kglobalaccel.Component"),
+                                    QDBusConnection::sessionBus());
+                kmix.call(QDBus::NoBlock, QStringLiteral("invokeShortcut"), QStringLiteral("increase_volume"));
+            } else if (value == QLatin1String("wave_down")) {
+                QDBusInterface kmix(QStringLiteral("org.kde.kglobalaccel"),
+                                    QStringLiteral("/component/kmix"),
+                                    QStringLiteral("org.kde.kglobalaccel.Component"),
+                                    QDBusConnection::sessionBus());
+                kmix.call(QDBus::NoBlock, QStringLiteral("invokeShortcut"), QStringLiteral("decrease_volume"));
+            }
+        }
+    }
 }
 
 #include "moc_plasmadeckplugin.cpp"

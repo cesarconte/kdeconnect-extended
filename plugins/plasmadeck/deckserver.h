@@ -39,6 +39,7 @@ public:
 
 Q_SIGNALS:
     void actionTriggered(const QString &actionId, const QString &command, const QString &shortcut);
+    void spatialEventReceived(const QString &type, const QString &stateOrGesture, int durationMs);
 
 private Q_SLOTS:
     void onNewConnection();
