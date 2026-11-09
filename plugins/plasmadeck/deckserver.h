@@ -18,7 +18,7 @@ class DeckServer : public QObject
     Q_OBJECT
 
 public:
-    explicit DeckServer(quint16 port = 54321, QObject *parent = nullptr);
+    explicit DeckServer(quint16 port = 1739, QObject *parent = nullptr);
     ~DeckServer() override;
 
     bool start();

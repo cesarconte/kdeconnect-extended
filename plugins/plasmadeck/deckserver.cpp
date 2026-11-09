@@ -127,8 +127,10 @@ void DeckServer::handleHttpRequest(QTcpSocket *socket, const QByteArray &data)
         return;
     }
 
-    if (method == QLatin1String("GET") && (path == QLatin1String("/") || path == QLatin1String("/index.html"))) {
-        sendResponse(socket, 200, QStringLiteral("text/html; charset=utf-8"), getIndexHtml());
+    if ((method == QLatin1String("GET") || method == QLatin1String("HEAD"))
+        && (path == QLatin1String("/") || path == QLatin1String("/index.html") || path.startsWith(QLatin1String("/?"))
+            || path.startsWith(QLatin1String("/index.html?")))) {
+        sendResponse(socket, 200, QStringLiteral("text/html; charset=utf-8"), (method == QLatin1String("HEAD")) ? QByteArray() : getIndexHtml());
         return;
     }
 

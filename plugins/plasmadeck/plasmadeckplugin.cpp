@@ -29,7 +29,7 @@ K_PLUGIN_CLASS_WITH_JSON(PlasmaDeckPlugin, "kdeconnect_plasmadeck.json")
 
 PlasmaDeckPlugin::PlasmaDeckPlugin(QObject *parent, const QVariantList &args)
     : KdeConnectPlugin(parent, args)
-    , m_server(54321, this)
+    , m_server(1739, this)
 {
     m_hostIp = findBestHostIp();
 
@@ -69,7 +69,7 @@ bool PlasmaDeckPlugin::isServerRunning() const
 
 QString PlasmaDeckPlugin::deckUrl() const
 {
-    return QStringLiteral("http://%1:54321/").arg(m_hostIp);
+    return QStringLiteral("http://%1:1739/").arg(m_hostIp);
 }
 
 QString PlasmaDeckPlugin::activeApp() const
