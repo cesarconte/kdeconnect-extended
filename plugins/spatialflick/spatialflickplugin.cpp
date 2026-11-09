@@ -152,20 +152,31 @@ void SpatialFlickPlugin::triggerFlickSend(const QStringList &urls)
         return;
     }
 
+    // Formatear rutas como URLs válidas de archivo (file://) requeridas por SharePlugin
+    QStringList formattedUrls;
+    formattedUrls.reserve(urls.size());
+    for (const QString &item : urls) {
+        if (item.startsWith(QLatin1String("file://"))) {
+            formattedUrls.append(item);
+        } else {
+            formattedUrls.append(QUrl::fromLocalFile(item).toString());
+        }
+    }
+
     // 1. Delegar envío directo a kdeconnect_share
     QDBusInterface shareIface(QStringLiteral("org.kde.kdeconnect"),
                               QStringLiteral("/modules/kdeconnect/devices/%1/share").arg(device()->id()),
                               QStringLiteral("org.kde.kdeconnect.device.share"),
                               QDBusConnection::sessionBus());
     if (shareIface.isValid()) {
-        shareIface.call(QDBus::NoBlock, QStringLiteral("shareUrls"), urls);
+        shareIface.call(QDBus::NoBlock, QStringLiteral("shareUrls"), formattedUrls);
     } else {
         auto *sharePlugin = device()->plugin(QStringLiteral("kdeconnect_share"));
         if (!sharePlugin) {
             sharePlugin = device()->plugin(QStringLiteral("share"));
         }
         if (sharePlugin) {
-            QMetaObject::invokeMethod(sharePlugin, "shareUrls", Q_ARG(QStringList, urls));
+            QMetaObject::invokeMethod(sharePlugin, "shareUrls", Q_ARG(QStringList, formattedUrls));
         }
     }
 

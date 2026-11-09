@@ -27,4 +27,5 @@ private:
 
     QList<KRunner::Action> m_deviceActions;
     QList<KRunner::Action> m_contactActions;
+    qint64 m_lastMountAttempt = 0;
 };

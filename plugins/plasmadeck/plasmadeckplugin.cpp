@@ -20,6 +20,7 @@
 #include <QNetworkInterface>
 #include <QRandomGenerator>
 #include <QSettings>
+#include <QStandardPaths>
 #include <QTextStream>
 #include <sys/sysinfo.h>
 
@@ -664,7 +665,11 @@ void PlasmaDeckPlugin::handleFlickReceived(const QString &fileName, const QStrin
     QString savedPath;
     if (!fileDataB64.isEmpty()) {
         const QString cleanName = fileName.isEmpty() ? QStringLiteral("flick_%1.bin").arg(QDateTime::currentMSecsSinceEpoch()) : QFileInfo(fileName).fileName();
-        savedPath = QDir::homePath() + QStringLiteral("/Downloads/") + cleanName;
+        QString dlDir = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
+        if (dlDir.isEmpty() || !QDir(dlDir).exists()) {
+            dlDir = QDir::homePath() + QStringLiteral("/Downloads");
+        }
+        savedPath = dlDir + QLatin1Char('/') + cleanName;
 
         QByteArray data = QByteArray::fromBase64(fileDataB64.toUtf8());
         QFile f(savedPath);

@@ -177,8 +177,45 @@ void DeckServer::onClientDataReady()
         return;
     }
 
-    const QByteArray data = socket->readAll();
-    handleHttpRequest(socket, data);
+    QByteArray &buf = m_clientBuffers[socket];
+    buf.append(socket->readAll());
+
+    // Comprobar si se han recibido los encabezados HTTP completos
+    int headerEnd = buf.indexOf("\r\n\r\n");
+    int headerLen = 4;
+    if (headerEnd == -1) {
+        headerEnd = buf.indexOf("\n\n");
+        headerLen = 2;
+    }
+
+    if (headerEnd == -1) {
+        // Encabezados aún incompletos, esperar a más paquetes TCP
+        return;
+    }
+
+    // Comprobar si hay Content-Length especificado en la petición POST
+    int contentLength = 0;
+    const QByteArray headerBytes = buf.left(headerEnd);
+    int clIdx = headerBytes.indexOf("Content-Length:");
+    if (clIdx == -1) {
+        clIdx = headerBytes.indexOf("content-length:");
+    }
+    if (clIdx != -1) {
+        int valStart = clIdx + 15;
+        int lineEnd = headerBytes.indexOf('\n', valStart);
+        if (lineEnd != -1) {
+            contentLength = headerBytes.mid(valStart, lineEnd - valStart).trimmed().toInt();
+        }
+    }
+
+    // Esperar a que el cuerpo completo del archivo/payload haya llegado
+    if (buf.size() < headerEnd + headerLen + contentLength) {
+        return;
+    }
+
+    const QByteArray fullRequest = buf;
+    m_clientBuffers.remove(socket);
+    handleHttpRequest(socket, fullRequest);
 }
 
 void DeckServer::onClientDisconnected()
@@ -188,6 +225,7 @@ void DeckServer::onClientDisconnected()
         return;
     }
 
+    m_clientBuffers.remove(socket);
     m_sseClients.removeAll(socket);
     socket->deleteLater();
 }

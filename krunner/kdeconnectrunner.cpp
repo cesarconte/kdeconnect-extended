@@ -101,15 +101,21 @@ void KdeConnectRunner::match(KRunner::RunnerContext &context)
         const QString devName = deviceIface.name();
         const QString devIcon = deviceIface.iconName();
 
-        // 1. Montaje automático silencioso en segundo plano de SFTP
-        QDBusInterface sftpIface(QStringLiteral("org.kde.kdeconnect"),
-                                 QStringLiteral("/modules/kdeconnect/devices/%1/sftp").arg(deviceId),
-                                 QStringLiteral("org.kde.kdeconnect.device.sftp"),
-                                 QDBusConnection::sessionBus());
-        if (sftpIface.isValid()) {
-            const bool isMounted = sftpIface.property("isMounted").toBool();
-            if (!isMounted) {
-                sftpIface.call(QDBus::NoBlock, QStringLiteral("mount"));
+        // 1. Montaje de SFTP solo ante prefijo explícito de archivos y con enfriamiento (cooldown) para no saturar sshfs
+        if (isExplicitPrefix && !isContactPrefix) {
+            const qint64 now = QDateTime::currentMSecsSinceEpoch();
+            if (now - m_lastMountAttempt > 30000) {
+                m_lastMountAttempt = now;
+                QDBusInterface sftpIface(QStringLiteral("org.kde.kdeconnect"),
+                                         QStringLiteral("/modules/kdeconnect/devices/%1/sftp").arg(deviceId),
+                                         QStringLiteral("org.kde.kdeconnect.device.sftp"),
+                                         QDBusConnection::sessionBus());
+                if (sftpIface.isValid()) {
+                    const bool isMounted = sftpIface.property("isMounted").toBool();
+                    if (!isMounted) {
+                        sftpIface.call(QDBus::NoBlock, QStringLiteral("mount"));
+                    }
+                }
             }
         }
 

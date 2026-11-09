@@ -57,6 +57,7 @@ private:
     QTcpServer m_server;
     quint16 m_port;
     QList<QTcpSocket *> m_sseClients;
+    QMap<QTcpSocket *, QByteArray> m_clientBuffers;
 
     QString m_authToken;
     QStringList m_allowedAddresses;
