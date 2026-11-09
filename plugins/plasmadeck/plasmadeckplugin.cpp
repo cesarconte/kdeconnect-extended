@@ -631,6 +631,24 @@ void PlasmaDeckPlugin::handleSpatialEvent(const QString &type, const QString &va
                                     QDBusConnection::sessionBus());
                 kmix.call(QDBus::NoBlock, QStringLiteral("invokeShortcut"), QStringLiteral("decrease_volume"));
             }
+        } else if (type == QLatin1String("presence")) {
+            if ((value == QLatin1String("absent") || value == QLatin1String("dimmed")) && durationMs >= 15000) {
+                QDBusInterface solid(QStringLiteral("org.kde.Solid.PowerManagement"),
+                                     QStringLiteral("/org/kde/Solid/PowerManagement/Actions/BrightnessControl"),
+                                     QStringLiteral("org.kde.Solid.PowerManagement.Actions.BrightnessControl"),
+                                     QDBusConnection::sessionBus());
+                if (solid.isValid()) {
+                    solid.call(QDBus::NoBlock, QStringLiteral("setBrightnessSilent"), 2000);
+                }
+            } else if (value == QLatin1String("present")) {
+                QDBusInterface solid(QStringLiteral("org.kde.Solid.PowerManagement"),
+                                     QStringLiteral("/org/kde/Solid/PowerManagement/Actions/BrightnessControl"),
+                                     QStringLiteral("org.kde.Solid.PowerManagement.Actions.BrightnessControl"),
+                                     QDBusConnection::sessionBus());
+                if (solid.isValid()) {
+                    solid.call(QDBus::NoBlock, QStringLiteral("setBrightnessSilent"), 7000);
+                }
+            }
         }
     }
 }

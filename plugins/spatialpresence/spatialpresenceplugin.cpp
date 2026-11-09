@@ -281,23 +281,34 @@ void SpatialPresencePlugin::onPresenceChanged(const QString &state, int duration
             restoreBrightness();
         }
         Q_EMIT presenceChanged(true);
-    } else if (state == QLatin1String("absent") || state == QLatin1String("looking_away")) {
+    } else if (state == QLatin1String("absent") || state == QLatin1String("looking_away") || state == QLatin1String("dimmed")
+               || state == QLatin1String("away")) {
         Q_EMIT presenceChanged(false);
 
-        if (durationMs > 0) {
-            if (m_optPresenceDimming && durationMs >= (m_dimTimeoutSeconds * 1000) && !m_isDimmed) {
+        const int dimThresholdMs = m_dimTimeoutSeconds * 1000;
+        const int lockThresholdMs = m_lockTimeoutSeconds * 1000;
+
+        if (durationMs >= dimThresholdMs || state == QLatin1String("dimmed")) {
+            if (m_optPresenceDimming && !m_isDimmed) {
                 dimScreen();
             }
-            if (m_optPresenceLock && durationMs >= (m_lockTimeoutSeconds * 1000)) {
+        } else {
+            // Ausente pero antes del umbral: asegurar temporizador en PC con el tiempo restante
+            if (m_optPresenceDimming && !m_isDimmed && !m_dimTimer.isActive()) {
+                const int remaining = qMax(500, dimThresholdMs - durationMs);
+                m_dimTimer.start(remaining);
+            }
+        }
+
+        if (durationMs >= lockThresholdMs) {
+            if (m_optPresenceLock) {
                 lockSession();
             }
         } else {
-            // Iniciar temporizadores si aún no están corriendo
-            if (m_optPresenceDimming && !m_isDimmed && !m_dimTimer.isActive()) {
-                m_dimTimer.start(m_dimTimeoutSeconds * 1000);
-            }
+            // Iniciar temporizador de bloqueo en PC con el tiempo restante
             if (m_optPresenceLock && !m_lockTimer.isActive()) {
-                m_lockTimer.start(m_lockTimeoutSeconds * 1000);
+                const int remaining = qMax(1000, lockThresholdMs - durationMs);
+                m_lockTimer.start(remaining);
             }
         }
     }

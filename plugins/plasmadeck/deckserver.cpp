@@ -446,6 +446,7 @@ QByteArray DeckServer::getIndexHtml() const
 <title>Plasma Deck</title>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/face_detection.js" crossorigin="anonymous"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
   body {
@@ -527,7 +528,8 @@ QByteArray DeckServer::getIndexHtml() const
     transition: all 0.2s ease;
   }
   .radar-dot.present { background: #4ade80; box-shadow: 0 0 8px #4ade80; }
-  .radar-dot.absent { background: #facc15; box-shadow: 0 0 8px #facc15; }
+  .radar-dot.away, .radar-dot.absent { background: #facc15; box-shadow: 0 0 8px #facc15; }
+  .radar-dot.dimmed { background: #fb923c; box-shadow: 0 0 10px #fb923c; }
   .radar-dot.locked { background: #f87171; box-shadow: 0 0 8px #f87171; }
   .radar-dot.gesture { background: #38bdf8; box-shadow: 0 0 12px #38bdf8; transform: scale(1.3); }
 
@@ -980,11 +982,18 @@ QByteArray DeckServer::getIndexHtml() const
   let currentPoseHold = 0;
   let isGestureEngaged = false;
   let lastTriggeredPose = 'none';
-  let lastPresentTime = Date.now();
   let presenceState = 'present';
   let faceDetector = null;
   let mpHands = null;
   let isMediaPipeReady = false;
+  let mpFace = null;
+  let isMediaPipeFaceReady = false;
+  let lastFaceCheckTime = 0;
+  let lastFaceSeenTimestamp = Date.now();
+  let isFaceCurrentlyVisible = true;
+  let absentSent = false;
+  let dimmedSent = false;
+  let lockedSent = false;
 
   const poseLabels = {
     pointing_left: '👈 Escritorio Izq',
@@ -994,6 +1003,34 @@ QByteArray DeckServer::getIndexHtml() const
     palm_open: '⏯️ Play / Pausa (Media)',
     fist_hold: '🎙️ Silenciar Micrófono'
   };
+
+  function initMediaPipeFace() {
+    if (typeof FaceDetection !== 'undefined' && !mpFace) {
+      try {
+        mpFace = new FaceDetection({
+          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/${file}`
+        });
+        mpFace.setOptions({
+          model: 'short',
+          minDetectionConfidence: 0.5
+        });
+        mpFace.onResults((results) => {
+          if (results && results.detections && results.detections.length > 0) {
+            lastFaceSeenTimestamp = Date.now();
+            isFaceCurrentlyVisible = true;
+          } else {
+            isFaceCurrentlyVisible = false;
+          }
+        });
+        isMediaPipeFaceReady = true;
+        console.log('MediaPipe FaceDetection initialized');
+      } catch (err) {
+        console.warn('MediaPipe FaceDetection init fallback:', err);
+        mpFace = null;
+        isMediaPipeFaceReady = false;
+      }
+    }
+  }
 
   function initMediaPipe() {
     if (typeof Hands !== 'undefined' && !mpHands) {
@@ -1185,11 +1222,16 @@ QByteArray DeckServer::getIndexHtml() const
       document.getElementById('radarDetails').style.display = 'flex';
       document.getElementById('radarTitle').textContent = 'Sensor Espacial: Activo';
       document.getElementById('radarSub').textContent = 'Monitorizando presencia y gestos en el aire';
-      lastPresentTime = Date.now();
+      lastFaceSeenTimestamp = Date.now();
+      isFaceCurrentlyVisible = true;
+      absentSent = false;
+      dimmedSent = false;
+      lockedSent = false;
       presenceState = 'present';
       updateRadarPresenceUI('present', 'Atento / Presente');
 
       initMediaPipe();
+      initMediaPipeFace();
       processRadarFrame();
     } catch (err) {
       console.error('Error starting camera radar:', err);
@@ -1203,6 +1245,13 @@ QByteArray DeckServer::getIndexHtml() const
     isGestureEngaged = false;
     currentCandidatePose = 'none';
     currentPoseHold = 0;
+    absentSent = false;
+    dimmedSent = false;
+    lockedSent = false;
+    if (presenceState !== 'present') {
+      presenceState = 'present';
+      sendSpatialEvent('presence', 'present', 0);
+    }
     if (radarAnimId) {
       cancelAnimationFrame(radarAnimId);
       radarAnimId = null;
@@ -1226,10 +1275,13 @@ QByteArray DeckServer::getIndexHtml() const
   function updateRadarPresenceUI(state, text) {
     setRadarDot(state);
     const feed = document.getElementById('feedPresence');
+    if (!feed) return;
     if (state === 'present') {
       feed.innerHTML = '👁️ <b>Presencia:</b> <span style="color:#4ade80">' + text + '</span>';
-    } else if (state === 'absent') {
+    } else if (state === 'absent' || state === 'away') {
       feed.innerHTML = '🟡 <b>Presencia:</b> <span style="color:#facc15">' + text + '</span>';
+    } else if (state === 'dimmed') {
+      feed.innerHTML = '🌙 <b>Presencia:</b> <span style="color:#fb923c">' + text + '</span>';
     } else if (state === 'locked') {
       feed.innerHTML = '🔴 <b>Presencia:</b> <span style="color:#f87171">' + text + '</span>';
     }
@@ -1269,6 +1321,33 @@ QByteArray DeckServer::getIndexHtml() const
     }).catch(e => console.error(e));
   }
 
+  function checkGeometricFacePresence(data, w, h) {
+    let skinPixels = 0;
+    let minX = w, maxX = 0, minY = h, maxY = 0;
+    for (let y = Math.floor(h * 0.1); y < Math.floor(h * 0.75); y += 2) {
+      for (let x = Math.floor(w * 0.2); x < Math.floor(w * 0.8); x += 2) {
+        const idx = (y * w + x) * 4;
+        const r = data[idx];
+        const g = data[idx + 1];
+        const b = data[idx + 2];
+        const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+        const cb = 128 - 0.168736 * r - 0.331264 * g + 0.500 * b;
+        const cr = 128 + 0.500 * r - 0.418688 * g - 0.081312 * b;
+
+        if (luma > 40 && luma < 235 && cb >= 77 && cb <= 127 && cr >= 133 && cr <= 173) {
+          skinPixels++;
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+    const boxW = maxX - minX;
+    const boxH = maxY - minY;
+    return (skinPixels >= 250 && boxW >= 24 && boxH >= 28 && (boxH / boxW) >= 0.7 && (boxH / boxW) <= 2.2);
+  }
+
   let lastFrameTime = 0;
   const FRAME_INTERVAL = 50; // ~20 FPS
 
@@ -1303,89 +1382,77 @@ QByteArray DeckServer::getIndexHtml() const
     const prevCtx = previewCanvas.getContext('2d');
     prevCtx.drawImage(workerCanvas, 0, 0, previewCanvas.width, previewCanvas.height);
 
-    // 1. Detección Óptica de Presencia / Rostro (YCbCr + Gradiente)
-    let skinPixels = 0;
-    let sumLuma = 0;
-    let motionLeft = 0;
-    let motionCenter = 0;
-    let motionRight = 0;
-    let motionTop = 0;
-    let motionBottom = 0;
-
-    const currentGray = new Uint8Array(w * h);
-
-    for (let y = 0; y < h; y += 2) {
-      for (let x = 0; x < w; x += 2) {
-        const idx = (y * w + x) * 4;
-        const r = data[idx];
-        const g = data[idx + 1];
-        const b = data[idx + 2];
-
-        // Luma
-        const luma = 0.299 * r + 0.587 * g + 0.114 * b;
-        sumLuma += luma;
-        currentGray[y * w + x] = luma;
-
-        // YCbCr skin tone detection
-        const cb = 128 - 0.168736 * r - 0.331264 * g + 0.500 * b;
-        const cr = 128 + 0.500 * r - 0.418688 * g - 0.081312 * b;
-
-        if (luma > 35 && luma < 240 && cb >= 77 && cb <= 127 && cr >= 133 && cr <= 173) {
-          if (y < h * 0.8 && x > w * 0.15 && x < w * 0.85) {
-            skinPixels++;
+    // 1. Detección Óptica de Presencia / Rostro cada ~200ms
+    if (now - lastFaceCheckTime >= 200) {
+      lastFaceCheckTime = now;
+      if (faceDetector) {
+        try {
+          const faces = await faceDetector.detect(video);
+          if (faces && faces.length > 0) {
+            lastFaceSeenTimestamp = now;
+            isFaceCurrentlyVisible = true;
+          } else {
+            isFaceCurrentlyVisible = false;
+          }
+        } catch (e) {
+          if (isMediaPipeFaceReady && mpFace) {
+            try { await mpFace.send({ image: video }); } catch(err) {}
+          } else {
+            isFaceCurrentlyVisible = checkGeometricFacePresence(data, w, h);
+            if (isFaceCurrentlyVisible) lastFaceSeenTimestamp = now;
           }
         }
-
-        // Motion differencing
-        if (prevGray) {
-          const diff = Math.abs(luma - prevGray[y * w + x]);
-          if (diff > 22) {
-            if (x < 54) motionLeft += diff;
-            else if (x < 107) motionCenter += diff;
-            else motionRight += diff;
-
-            if (y < 60) motionTop += diff;
-            else motionBottom += diff;
-          }
+      } else if (isMediaPipeFaceReady && mpFace) {
+        try {
+          await mpFace.send({ image: video });
+        } catch (err) {
+          isFaceCurrentlyVisible = checkGeometricFacePresence(data, w, h);
+          if (isFaceCurrentlyVisible) lastFaceSeenTimestamp = now;
         }
+      } else {
+        isFaceCurrentlyVisible = checkGeometricFacePresence(data, w, h);
+        if (isFaceCurrentlyVisible) lastFaceSeenTimestamp = now;
       }
     }
 
-    prevGray = currentGray;
-    const totalSampled = (w / 2) * (h / 2);
-    const avgLuma = sumLuma / totalSampled;
+    // Evaluación de Presencia y Cuenta Atrás Dinámica
+    const elapsedSinceFace = now - lastFaceSeenTimestamp;
 
-    // FaceDetector API check if available
-    let facePresent = skinPixels > 90;
-    if (faceDetector && !facePresent) {
-      try {
-        const detected = await faceDetector.detect(video);
-        if (detected.length > 0) facePresent = true;
-      } catch(e) {}
-    }
-
-    // Evaluación de Presencia
-    if (facePresent) {
-      lastPresentTime = now;
+    if (elapsedSinceFace < 1500) {
       if (presenceState !== 'present') {
         presenceState = 'present';
+        absentSent = false;
+        dimmedSent = false;
+        lockedSent = false;
         sendSpatialEvent('presence', 'present', 0);
         updateRadarPresenceUI('present', 'Atento / Presente');
       }
     } else {
-      const absentDuration = now - lastPresentTime;
-      if (absentDuration >= 60000) {
-        if (presenceState !== 'locked') {
+      const absentSec = Math.floor(elapsedSinceFace / 1000);
+
+      if (absentSec >= 60) {
+        if (!lockedSent) {
           presenceState = 'locked';
-          sendSpatialEvent('presence', 'absent', absentDuration);
-          updateRadarPresenceUI('locked', 'Ausente >60s (Sesión bloqueada)');
+          lockedSent = true;
+          sendSpatialEvent('presence', 'absent', elapsedSinceFace);
         }
-      } else if (absentDuration >= 15000) {
-        if (presenceState !== 'absent') {
-          presenceState = 'absent';
-          sendSpatialEvent('presence', 'absent', absentDuration);
-          updateRadarPresenceUI('absent', 'Ausente >15s (Atenuando pantalla)');
+        updateRadarPresenceUI('locked', 'Sesión Bloqueada (>60s)');
+      } else if (absentSec >= 15) {
+        if (!dimmedSent) {
+          presenceState = 'dimmed';
+          dimmedSent = true;
+          sendSpatialEvent('presence', 'dimmed', elapsedSinceFace);
         }
+        const remainLock = 60 - absentSec;
+        updateRadarPresenceUI('dimmed', 'Ausente (' + absentSec + 's) - Atenuado | Bloqueo en ' + remainLock + 's');
+      } else {
+        if (!absentSent) {
+          presenceState = 'away';
+          absentSent = true;
+          sendSpatialEvent('presence', 'away', elapsedSinceFace);
+        }
+        const remainDim = 15 - absentSec;
+        updateRadarPresenceUI('away', 'Ausente (' + absentSec + 's) - Atenuando en ' + remainDim + 's...');
       }
     }
 

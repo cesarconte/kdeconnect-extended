@@ -36,32 +36,32 @@ public:
     QString dbusPath() const override;
     void receivePacket(const NetworkPacket &np) override;
 
-    bool isDimmed() const;
-    bool presenceDimmingEnabled() const;
-    void setPresenceDimmingEnabled(bool enabled);
-
-    bool presenceLockEnabled() const;
-    void setPresenceLockEnabled(bool enabled);
-
-    bool waveGesturesEnabled() const;
-    void setWaveGesturesEnabled(bool enabled);
-
-    bool micHoldGestureEnabled() const;
-    void setMicHoldGestureEnabled(bool enabled);
-
-    bool volumeGesturesEnabled() const;
-    void setVolumeGesturesEnabled(bool enabled);
-
-    int dimTimeoutSeconds() const;
-    void setDimTimeoutSeconds(int seconds);
-
-    int lockTimeoutSeconds() const;
-    void setLockTimeoutSeconds(int seconds);
-
-    int dimBrightnessPercent() const;
-    void setDimBrightnessPercent(int percent);
-
 public Q_SLOTS:
+    Q_SCRIPTABLE bool isDimmed() const;
+    Q_SCRIPTABLE bool presenceDimmingEnabled() const;
+    Q_SCRIPTABLE void setPresenceDimmingEnabled(bool enabled);
+
+    Q_SCRIPTABLE bool presenceLockEnabled() const;
+    Q_SCRIPTABLE void setPresenceLockEnabled(bool enabled);
+
+    Q_SCRIPTABLE bool waveGesturesEnabled() const;
+    Q_SCRIPTABLE void setWaveGesturesEnabled(bool enabled);
+
+    Q_SCRIPTABLE bool micHoldGestureEnabled() const;
+    Q_SCRIPTABLE void setMicHoldGestureEnabled(bool enabled);
+
+    Q_SCRIPTABLE bool volumeGesturesEnabled() const;
+    Q_SCRIPTABLE void setVolumeGesturesEnabled(bool enabled);
+
+    Q_SCRIPTABLE int dimTimeoutSeconds() const;
+    Q_SCRIPTABLE void setDimTimeoutSeconds(int seconds);
+
+    Q_SCRIPTABLE int lockTimeoutSeconds() const;
+    Q_SCRIPTABLE void setLockTimeoutSeconds(int seconds);
+
+    Q_SCRIPTABLE int dimBrightnessPercent() const;
+    Q_SCRIPTABLE void setDimBrightnessPercent(int percent);
+
     Q_SCRIPTABLE void onGestureDetected(const QString &gestureType);
     Q_SCRIPTABLE void onPresenceChanged(const QString &state, int durationMs = 0);
     Q_SCRIPTABLE void restoreBrightness();
