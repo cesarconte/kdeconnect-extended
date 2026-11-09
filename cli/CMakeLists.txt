@@ -13,6 +13,14 @@ target_link_libraries(kdeconnect-cli
     KF6::Crash
 )
 
-install(TARGETS kdeconnect-cli ${KDECONNECT_INSTALL_TARGETS_DEFAULT_ARGS} RUNTIME DESTINATION ${KDECONNECT_RUNTIME_DESTINATION})
+add_executable(kdeconnect-dualkey kdeconnect-dualkey.cpp)
+ecm_mark_nongui_executable(kdeconnect-dualkey)
+
+target_link_libraries(kdeconnect-dualkey
+    Qt6::Core
+    Qt6::Network
+)
+
+install(TARGETS kdeconnect-cli kdeconnect-dualkey ${KDECONNECT_INSTALL_TARGETS_DEFAULT_ARGS} RUNTIME DESTINATION ${KDECONNECT_RUNTIME_DESTINATION})
 
 install(FILES kdeconnect.zsh RENAME _kdeconnect DESTINATION ${KDE_INSTALL_ZSHAUTOCOMPLETEDIR})
