@@ -184,6 +184,8 @@ void PlasmaDeckPlugin::sendKeyShortcut(const QString &key, int specialKey, bool 
         }
 
         mousepad->receivePacket(np);
+    } else {
+        qWarning() << "PlasmaDeckPlugin: mousepad plugin not found on device!";
     }
 }
 
@@ -191,6 +193,8 @@ void PlasmaDeckPlugin::handleAction(const QString &actionId, const QString &cmd,
 {
     Q_UNUSED(cmd)
     Q_UNUSED(shortcut)
+
+    qDebug() << "PlasmaDeckPlugin: action triggered:" << actionId;
 
     // SYSTEM ACTIONS
     if (actionId == QLatin1String("screenshot")) {
@@ -263,7 +267,8 @@ void PlasmaDeckPlugin::handleAction(const QString &actionId, const QString &cmd,
         // WEB ACTIONS
     } else if (actionId == QLatin1String("new_tab")) {
         sendKeyShortcut(QStringLiteral("t"), 0, true, false, false, false); // Ctrl+T
-        QProcess::startDetached(QStringLiteral("xdg-open"), {QStringLiteral("chrome://newtab")});
+        // Abrir URL válida en navegador por defecto si no responde al atajo
+        QProcess::startDetached(QStringLiteral("xdg-open"), {QStringLiteral("https://www.google.com")});
     } else if (actionId == QLatin1String("reload")) {
         sendKeyShortcut(QStringLiteral("r"), 0, true, false, false, false); // Ctrl+R
         sendKeyShortcut(QString(), 25, false, false, false, false); // F5
