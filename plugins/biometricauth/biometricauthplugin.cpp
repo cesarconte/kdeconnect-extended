@@ -13,10 +13,12 @@
 #include <KNotification>
 #include <KPluginFactory>
 #include <QDateTime>
+#include <QDir>
 #include <QFile>
 #include <QHostInfo>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QSettings>
 #include <QStandardPaths>
 #include <QUuid>
 #include <sys/stat.h>
@@ -29,6 +31,7 @@ BiometricAuthPlugin::BiometricAuthPlugin(QObject *parent, const QVariantList &ar
     setupSocketServer();
     connect(&m_timeoutTimer, &QTimer::timeout, this, &BiometricAuthPlugin::handleAuthTimeout);
     m_timeoutTimer.setSingleShot(true);
+    registerRunCommands();
 }
 
 BiometricAuthPlugin::~BiometricAuthPlugin()
@@ -203,6 +206,9 @@ void BiometricAuthPlugin::handleSocketData()
     NetworkPacket ping(PACKET_TYPE_PING);
     sendPacket(ping);
 
+    // Enviar notificación visible al móvil (en pantalla bloqueada y barra de notificaciones)
+    sendMobileNotification(service, m_currentCommand, m_currentRiskLevel);
+
     // Mostrar aviso en el escritorio
     notifyDesktop(service, m_currentCommand, m_currentRiskLevel);
 
@@ -271,6 +277,7 @@ void BiometricAuthPlugin::handleAuthTimeout()
     }
 
     m_isPending = false;
+    cancelMobileNotification();
     sendResponseToPam(QStringLiteral("timeout"), i18n("Tiempo límite de autenticación agotado"));
     Q_EMIT authenticationFinished(false);
 
@@ -290,6 +297,7 @@ void BiometricAuthPlugin::respondBiometric(bool accepted)
 
     m_timeoutTimer.stop();
     m_isPending = false;
+    cancelMobileNotification();
 
     if (accepted) {
         sendResponseToPam(QStringLiteral("success"), i18n("Autenticado biométricamente con éxito"));
@@ -348,6 +356,8 @@ QString BiometricAuthPlugin::requestAuthorization(const QString &service, const 
     NetworkPacket ping(PACKET_TYPE_PING);
     sendPacket(ping);
 
+    sendMobileNotification(service, m_currentCommand, m_currentRiskLevel);
+
     notifyDesktop(service, m_currentCommand, m_currentRiskLevel);
 
     m_timeoutTimer.stop();
@@ -357,6 +367,68 @@ QString BiometricAuthPlugin::requestAuthorization(const QString &service, const 
     Q_EMIT authRequested(m_currentTransactionId, service, m_currentCommand, m_currentRiskLevel);
 
     return m_currentTransactionId;
+}
+
+void BiometricAuthPlugin::sendMobileNotification(const QString &service, const QString &command, const QString &riskLevel)
+{
+    NetworkPacket mobileNotif(QStringLiteral("kdeconnect.notification"));
+    mobileNotif.set(QStringLiteral("id"), QStringLiteral("dualkey_auth_request"));
+    mobileNotif.set(QStringLiteral("appName"), QStringLiteral("KDE Connect Dual-Key"));
+    mobileNotif.set(QStringLiteral("title"), i18n("🔑 Dual-Key: Autorización Requerida [%1]", riskLevel.toUpper()));
+    const QString cmdText = !command.isEmpty() ? command : service;
+    const QString bodyText = i18n("Comando: %1\nToca 'Aprobar Dual-Key' en Ejecutar Órdenes o abre Plasma Deck.", cmdText);
+    mobileNotif.set(QStringLiteral("text"), bodyText);
+    mobileNotif.set(QStringLiteral("ticker"), i18n("🔑 Dual-Key: Autorización Requerida"));
+    mobileNotif.set(QStringLiteral("isClearable"), true);
+    mobileNotif.set(QStringLiteral("silent"), false);
+    sendPacket(mobileNotif);
+}
+
+void BiometricAuthPlugin::cancelMobileNotification()
+{
+    NetworkPacket cancelNotif(QStringLiteral("kdeconnect.notification"));
+    cancelNotif.set(QStringLiteral("id"), QStringLiteral("dualkey_auth_request"));
+    cancelNotif.set(QStringLiteral("isCancel"), true);
+    sendPacket(cancelNotif);
+}
+
+void BiometricAuthPlugin::registerRunCommands()
+{
+    if (!device()) {
+        return;
+    }
+
+    const QString configPath =
+        QStringLiteral("%1/%2/kdeconnect_runcommand/config").arg(QDir::homePath() + QStringLiteral("/.config/kdeconnect")).arg(device()->id());
+
+    QSettings s(configPath, QSettings::IniFormat);
+    QJsonObject json = QJsonDocument::fromJson(s.value(QStringLiteral("commands")).toByteArray()).object();
+
+    QJsonObject approveEntry;
+    approveEntry[QStringLiteral("name")] = QString::fromUtf8("✅ Aprobar Dual-Key");
+    approveEntry[QStringLiteral("command")] =
+        QStringLiteral(
+            "/usr/bin/qdbus6 org.kde.kdeconnect /modules/kdeconnect/devices/%1/biometricauth org.kde.kdeconnect.device.biometricauth.respondBiometric true")
+            .arg(device()->id());
+
+    QJsonObject rejectEntry;
+    rejectEntry[QStringLiteral("name")] = QString::fromUtf8("❌ Rechazar Dual-Key");
+    rejectEntry[QStringLiteral("command")] =
+        QStringLiteral(
+            "/usr/bin/qdbus6 org.kde.kdeconnect /modules/kdeconnect/devices/%1/biometricauth org.kde.kdeconnect.device.biometricauth.respondBiometric false")
+            .arg(device()->id());
+
+    json[QStringLiteral("dualkey_approve")] = approveEntry;
+    json[QStringLiteral("dualkey_reject")] = rejectEntry;
+
+    QJsonDocument doc(json);
+    s.setValue(QStringLiteral("commands"), doc.toJson(QJsonDocument::Compact));
+    s.sync();
+}
+
+void BiometricAuthPlugin::connected()
+{
+    registerRunCommands();
 }
 
 void BiometricAuthPlugin::receivePacket(const NetworkPacket &np)

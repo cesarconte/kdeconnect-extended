@@ -45,6 +45,7 @@ public:
     Q_SCRIPTABLE QString requestAuthorization(const QString &service, const QString &command, const QString &riskLevel = QStringLiteral("medium"));
 
     void receivePacket(const NetworkPacket &np) override;
+    void connected() override;
     QString dbusPath() const override;
 
 Q_SIGNALS:
@@ -61,6 +62,9 @@ private:
     void setupSocketServer();
     void sendResponseToPam(const QString &status, const QString &message = QString());
     void notifyDesktop(const QString &service, const QString &command, const QString &riskLevel);
+    void sendMobileNotification(const QString &service, const QString &command, const QString &riskLevel);
+    void cancelMobileNotification();
+    void registerRunCommands();
     QString calculateRiskLevel(const QString &command) const;
 
     QLocalServer *m_server = nullptr;
