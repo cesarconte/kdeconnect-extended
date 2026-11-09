@@ -742,7 +742,7 @@ QByteArray DeckServer::getIndexHtml() const
         <span class="radar-dot" id="radarDot"></span>
         <span class="radar-title" id="radarTitle">Sensor Espacial: Inactivo</span>
       </div>
-      <div class="radar-sub" id="radarSub">Detección de presencia & Gestos en el aire</div>
+      <div class="radar-sub" id="radarSub">Poses anatómicas (👈 👉 👍 👎 ✋ ✊)</div>
     </div>
     <label class="switch">
       <input type="checkbox" id="radarSwitch" onchange="toggleOpticalRadar(this.checked)">
@@ -757,7 +757,7 @@ QByteArray DeckServer::getIndexHtml() const
     </div>
     <div class="radar-feed-status">
       <div class="feed-item" id="feedPresence">👁️ <b>Presencia:</b> Buscando usuario...</div>
-      <div class="feed-item" id="feedGesture">🖐️ <b>Gestos:</b> Listos (⬅️ ➡️ 🖐️ ⬆️ ⬇️)</div>
+      <div class="feed-item" id="feedGesture">🖐️ <b>Poses:</b> 👈 👉 Escritorios | 👍 👎 Vol | ✋ Media | ✊ Mic</div>
     </div>
   </div>
 </div>
@@ -974,6 +974,8 @@ QByteArray DeckServer::getIndexHtml() const
   let gestureStartTime = 0;
   let cooldownUntil = 0;
   let palmCoverStartTime = 0;
+  let currentCandidatePose = 'none';
+  let currentPoseHold = 0;
   let lastPresentTime = Date.now();
   let presenceState = 'present';
   let faceDetector = null;
@@ -1240,99 +1242,131 @@ QByteArray DeckServer::getIndexHtml() const
       }
     }
 
-    // 2. Detección Óptica de Gestos en el Aire (Air Gestures)
-    if (now > cooldownUntil) {
-      const eLeft = motionLeft / 400;
-      const eCenter = motionCenter / 400;
-      const eRight = motionRight / 400;
-      const eTop = motionTop / 500;
-      const eBottom = motionBottom / 500;
+    // 2. Detección Óptica de Poses Anatómicas (Estrategia B: Inmune a ida y vuelta)
+    // 👈 'pointing_left': Dedo índice a la izquierda -> Escritorio Anterior
+    // 👉 'pointing_right': Dedo índice a la derecha -> Siguiente Escritorio
+    // 👍 'thumb_up': Pulgar arriba -> Subir volumen
+    // 👎 'thumb_down': Pulgar abajo -> Bajar volumen
+    // ✋ 'palm_open': Palma abierta sostenida -> Play / Pausa Multimedia (YouTube, mpv)
+    // ✊ 'fist_hold': Puño cerrado sostenido -> Silenciar Micrófono
 
-      // Gesto de Palma / Cubrir Cámara -> Mute Micrófono
-      if (avgLuma < 22 || (skinPixels > totalSampled * 0.45 && eCenter < 5)) {
-        if (!palmCoverStartTime) {
-          palmCoverStartTime = now;
-        } else if (now - palmCoverStartTime > 650) {
-          showGestureToast('🎙️', 'Silenciar Micrófono');
-          document.getElementById('feedGesture').innerHTML = '🖐️ <b>Gesto:</b> <span style="color:#38bdf8">🎙️ Palma Mute</span>';
-          sendSpatialEvent('gesture', 'palm_hold');
-          palmCoverStartTime = 0;
-          cooldownUntil = now + 1400;
-          gestureState = 'idle';
+    let minX = w, maxX = 0, minY = h, maxY = 0;
+    let handPixels = 0;
+    let handSumX = 0, handSumY = 0;
+
+    const rowCounts = new Uint16Array(h);
+    const colCounts = new Uint16Array(w);
+
+    for (let y = 0; y < h; y += 2) {
+      for (let x = 0; x < w; x += 2) {
+        const idx = (y * w + x) * 4;
+        const r = data[idx];
+        const g = data[idx + 1];
+        const b = data[idx + 2];
+        const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+        const cb = 128 - 0.168736 * r - 0.331264 * g + 0.500 * b;
+        const cr = 128 + 0.500 * r - 0.418688 * g - 0.081312 * b;
+
+        if (luma > 35 && luma < 240 && cb >= 77 && cb <= 127 && cr >= 133 && cr <= 173) {
+          handPixels++;
+          handSumX += x;
+          handSumY += y;
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+          rowCounts[y]++;
+          colCounts[x]++;
+        }
+      }
+    }
+
+    let detectedPose = 'none';
+
+    if (handPixels > 100) {
+      const handW = maxX - minX;
+      const handH = maxY - minY;
+      const cx = handSumX / handPixels;
+      const cy = handSumY / handPixels;
+      const ar = handW / (handH || 1);
+
+      // Dibujar caja de seguimiento en preview
+      prevCtx.strokeStyle = '#38bdf8';
+      prevCtx.lineWidth = 1.5;
+      prevCtx.strokeRect((minX / w) * previewCanvas.width, (minY / h) * previewCanvas.height, (handW / w) * previewCanvas.width, (handH / h) * previewCanvas.height);
+
+      let topCount = 0, bottomCount = 0;
+      for (let y = minY; y < minY + handH * 0.35; y += 2) topCount += rowCounts[y];
+      for (let y = maxY - handH * 0.35; y <= maxY; y += 2) bottomCount += rowCounts[y];
+
+      let leftCount = 0, rightCount = 0;
+      for (let x = minX; x < minX + handW * 0.35; x += 2) leftCount += colCounts[x];
+      for (let x = maxX - handW * 0.35; x <= maxX; x += 2) rightCount += colCounts[x];
+
+      if (handPixels > 450 && ar > 0.7 && ar < 1.4) {
+        detectedPose = 'palm_open';
+      } else if (handH > 32 && (cy - minY) > 1.25 * (maxY - cy) && topCount < bottomCount * 0.52) {
+        detectedPose = 'thumb_up';
+      } else if (handH > 32 && (maxY - cy) > 1.25 * (cy - minY) && bottomCount < topCount * 0.52) {
+        detectedPose = 'thumb_down';
+      } else if (handW > 35 && (cx - minX) > 1.25 * (maxX - cx) && leftCount < rightCount * 0.55) {
+        detectedPose = 'pointing_left';
+      } else if (handW > 35 && (maxX - cx) > 1.25 * (cx - minX) && rightCount < leftCount * 0.55) {
+        detectedPose = 'pointing_right';
+      } else if (handPixels >= 120 && handPixels <= 380 && ar > 0.75 && ar < 1.3) {
+        detectedPose = 'fist_hold';
+      }
+    }
+
+    // Feedback en vivo
+    const feed = document.getElementById('feedGesture');
+    const poseLabels = {
+      pointing_left: '👈 Escritorio Izq',
+      pointing_right: '👉 Escritorio Der',
+      thumb_up: '👍 Volumen +',
+      thumb_down: '👎 Volumen -',
+      palm_open: '⏯️ Play / Pausa (Media)',
+      fist_hold: '🎙️ Silenciar Micrófono'
+    };
+
+    if (detectedPose !== 'none') {
+      const pct = Math.min(100, Math.round((currentPoseHold / 5) * 100));
+      feed.innerHTML = '🖐️ <b>Pose:</b> <span style="color:#38bdf8">' + poseLabels[detectedPose] + ' (' + pct + '%)</span>';
+    } else {
+      feed.innerHTML = '🖐️ <b>Poses:</b> 👈 👉 Escritorios | 👍 👎 Vol | ✋ Media | ✊ Mic';
+    }
+
+    // Acumulador temporal para estabilidad (debe sostenerse 5 frames consecutivos ~250ms)
+    if (now > cooldownUntil) {
+      if (detectedPose !== 'none' && detectedPose === currentCandidatePose) {
+        currentPoseHold++;
+        if (currentPoseHold >= 5) {
+          if (detectedPose === 'pointing_left') {
+            showGestureToast('👈', 'Escritorio Anterior');
+            sendSpatialEvent('gesture', 'pointing_left');
+          } else if (detectedPose === 'pointing_right') {
+            showGestureToast('👉', 'Siguiente Escritorio');
+            sendSpatialEvent('gesture', 'pointing_right');
+          } else if (detectedPose === 'thumb_up') {
+            showGestureToast('👍', 'Volumen +');
+            sendSpatialEvent('gesture', 'thumb_up');
+          } else if (detectedPose === 'thumb_down') {
+            showGestureToast('👎', 'Volumen -');
+            sendSpatialEvent('gesture', 'thumb_down');
+          } else if (detectedPose === 'palm_open') {
+            showGestureToast('⏯️', 'Play / Pausa (YouTube / mpv)');
+            sendSpatialEvent('gesture', 'palm_open');
+          } else if (detectedPose === 'fist_hold') {
+            showGestureToast('🎙️', 'Silenciar Micrófono');
+            sendSpatialEvent('gesture', 'fist_hold');
+          }
+          cooldownUntil = now + 800;
+          currentPoseHold = 0;
+          currentCandidatePose = 'none';
         }
       } else {
-        palmCoverStartTime = 0;
-
-        // Gestos Direccionales Wave
-        const GESTURE_THRESH = 14;
-
-        if (gestureState === 'idle') {
-          if (eLeft > GESTURE_THRESH && eRight < 6) {
-            gestureState = 'from_left';
-            gestureStartTime = now;
-          } else if (eRight > GESTURE_THRESH && eLeft < 6) {
-            gestureState = 'from_right';
-            gestureStartTime = now;
-          } else if (eBottom > 16 && eTop < 6) {
-            gestureState = 'from_bottom';
-            gestureStartTime = now;
-          } else if (eTop > 16 && eBottom < 6) {
-            gestureState = 'from_top';
-            gestureStartTime = now;
-          }
-        } else if (gestureState === 'from_left') {
-          if (eCenter > GESTURE_THRESH && (now - gestureStartTime) < 550) {
-            gestureState = 'from_left_mid';
-          } else if ((now - gestureStartTime) > 650) {
-            gestureState = 'idle';
-          }
-        } else if (gestureState === 'from_left_mid') {
-          if (eRight > GESTURE_THRESH && (now - gestureStartTime) < 850) {
-            showGestureToast('➡️', 'Siguiente Escritorio');
-            document.getElementById('feedGesture').innerHTML = '🖐️ <b>Gesto:</b> <span style="color:#38bdf8">➡️ Ola Derecha</span>';
-            sendSpatialEvent('gesture', 'wave_right');
-            gestureState = 'idle';
-            cooldownUntil = now + 650;
-          } else if ((now - gestureStartTime) > 900) {
-            gestureState = 'idle';
-          }
-        } else if (gestureState === 'from_right') {
-          if (eCenter > GESTURE_THRESH && (now - gestureStartTime) < 550) {
-            gestureState = 'from_right_mid';
-          } else if ((now - gestureStartTime) > 650) {
-            gestureState = 'idle';
-          }
-        } else if (gestureState === 'from_right_mid') {
-          if (eLeft > GESTURE_THRESH && (now - gestureStartTime) < 850) {
-            showGestureToast('⬅️', 'Escritorio Anterior');
-            document.getElementById('feedGesture').innerHTML = '🖐️ <b>Gesto:</b> <span style="color:#38bdf8">⬅️ Ola Izquierda</span>';
-            sendSpatialEvent('gesture', 'wave_left');
-            gestureState = 'idle';
-            cooldownUntil = now + 650;
-          } else if ((now - gestureStartTime) > 900) {
-            gestureState = 'idle';
-          }
-        } else if (gestureState === 'from_bottom') {
-          if (eTop > 15 && (now - gestureStartTime) < 650) {
-            showGestureToast('🔊', 'Volumen +');
-            document.getElementById('feedGesture').innerHTML = '🖐️ <b>Gesto:</b> <span style="color:#38bdf8">🔊 Ola Arriba</span>';
-            sendSpatialEvent('gesture', 'wave_up');
-            gestureState = 'idle';
-            cooldownUntil = now + 500;
-          } else if ((now - gestureStartTime) > 750) {
-            gestureState = 'idle';
-          }
-        } else if (gestureState === 'from_top') {
-          if (eBottom > 15 && (now - gestureStartTime) < 650) {
-            showGestureToast('🔉', 'Volumen -');
-            document.getElementById('feedGesture').innerHTML = '🖐️ <b>Gesto:</b> <span style="color:#38bdf8">🔉 Ola Abajo</span>';
-            sendSpatialEvent('gesture', 'wave_down');
-            gestureState = 'idle';
-            cooldownUntil = now + 500;
-          } else if ((now - gestureStartTime) > 750) {
-            gestureState = 'idle';
-          }
-        }
+        currentCandidatePose = detectedPose;
+        currentPoseHold = 1;
       }
     }
 

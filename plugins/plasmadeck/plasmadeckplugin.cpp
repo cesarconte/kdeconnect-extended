@@ -594,31 +594,37 @@ void PlasmaDeckPlugin::handleSpatialEvent(const QString &type, const QString &va
     } else {
         // Fallback directo a KWin / KMix si el plugin aún no está conectado al bus
         if (type == QLatin1String("gesture")) {
-            if (value == QLatin1String("wave_right")) {
+            if (value == QLatin1String("pointing_right") || value == QLatin1String("wave_right")) {
                 QDBusInterface kwin(QStringLiteral("org.kde.kglobalaccel"),
                                     QStringLiteral("/component/kwin"),
                                     QStringLiteral("org.kde.kglobalaccel.Component"),
                                     QDBusConnection::sessionBus());
                 kwin.call(QDBus::NoBlock, QStringLiteral("invokeShortcut"), QStringLiteral("Switch One Desktop to the Right"));
-            } else if (value == QLatin1String("wave_left")) {
+            } else if (value == QLatin1String("pointing_left") || value == QLatin1String("wave_left")) {
                 QDBusInterface kwin(QStringLiteral("org.kde.kglobalaccel"),
                                     QStringLiteral("/component/kwin"),
                                     QStringLiteral("org.kde.kglobalaccel.Component"),
                                     QDBusConnection::sessionBus());
                 kwin.call(QDBus::NoBlock, QStringLiteral("invokeShortcut"), QStringLiteral("Switch One Desktop to the Left"));
-            } else if (value == QLatin1String("palm_hold")) {
+            } else if (value == QLatin1String("fist_hold") || value == QLatin1String("palm_hold") || value == QLatin1String("mic_mute")) {
                 QDBusInterface kmix(QStringLiteral("org.kde.kglobalaccel"),
                                     QStringLiteral("/component/kmix"),
                                     QStringLiteral("org.kde.kglobalaccel.Component"),
                                     QDBusConnection::sessionBus());
                 kmix.call(QDBus::NoBlock, QStringLiteral("invokeShortcut"), QStringLiteral("mic_mute"));
-            } else if (value == QLatin1String("wave_up")) {
+            } else if (value == QLatin1String("palm_open") || value == QLatin1String("media_play_pause")) {
+                QDBusInterface media(QStringLiteral("org.kde.kglobalaccel"),
+                                     QStringLiteral("/component/mediacontrol"),
+                                     QStringLiteral("org.kde.kglobalaccel.Component"),
+                                     QDBusConnection::sessionBus());
+                media.call(QDBus::NoBlock, QStringLiteral("invokeShortcut"), QStringLiteral("playpausemedia"));
+            } else if (value == QLatin1String("thumb_up") || value == QLatin1String("wave_up")) {
                 QDBusInterface kmix(QStringLiteral("org.kde.kglobalaccel"),
                                     QStringLiteral("/component/kmix"),
                                     QStringLiteral("org.kde.kglobalaccel.Component"),
                                     QDBusConnection::sessionBus());
                 kmix.call(QDBus::NoBlock, QStringLiteral("invokeShortcut"), QStringLiteral("increase_volume"));
-            } else if (value == QLatin1String("wave_down")) {
+            } else if (value == QLatin1String("thumb_down") || value == QLatin1String("wave_down")) {
                 QDBusInterface kmix(QStringLiteral("org.kde.kglobalaccel"),
                                     QStringLiteral("/component/kmix"),
                                     QStringLiteral("org.kde.kglobalaccel.Component"),

@@ -21,6 +21,12 @@ private Q_SLOTS:
     void testGesturePacketSerialization()
     {
         const QStringList gestures = {
+            QStringLiteral("pointing_right"),
+            QStringLiteral("pointing_left"),
+            QStringLiteral("thumb_up"),
+            QStringLiteral("thumb_down"),
+            QStringLiteral("palm_open"),
+            QStringLiteral("fist_hold"),
             QStringLiteral("wave_right"),
             QStringLiteral("wave_left"),
             QStringLiteral("palm_hold"),

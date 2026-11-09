@@ -213,7 +213,7 @@ void SpatialPresencePlugin::onGestureDetected(const QString &gestureType)
 {
     qCDebug(KDECONNECT_PLUGIN_SPATIALPRESENCE) << "Spatial gesture received:" << gestureType;
 
-    if (gestureType == QLatin1String("wave_right")) {
+    if (gestureType == QLatin1String("pointing_right") || gestureType == QLatin1String("wave_right")) {
         if (m_optWaveGestures) {
             QDBusInterface kwin(QStringLiteral("org.kde.kglobalaccel"),
                                 QStringLiteral("/component/kwin"),
@@ -222,7 +222,7 @@ void SpatialPresencePlugin::onGestureDetected(const QString &gestureType)
             kwin.call(QDBus::NoBlock, QStringLiteral("invokeShortcut"), QStringLiteral("Switch One Desktop to the Right"));
             Q_EMIT gestureTriggered(gestureType);
         }
-    } else if (gestureType == QLatin1String("wave_left")) {
+    } else if (gestureType == QLatin1String("pointing_left") || gestureType == QLatin1String("wave_left")) {
         if (m_optWaveGestures) {
             QDBusInterface kwin(QStringLiteral("org.kde.kglobalaccel"),
                                 QStringLiteral("/component/kwin"),
@@ -231,16 +231,7 @@ void SpatialPresencePlugin::onGestureDetected(const QString &gestureType)
             kwin.call(QDBus::NoBlock, QStringLiteral("invokeShortcut"), QStringLiteral("Switch One Desktop to the Left"));
             Q_EMIT gestureTriggered(gestureType);
         }
-    } else if (gestureType == QLatin1String("palm_hold")) {
-        if (m_optMicHoldGesture) {
-            QDBusInterface kmix(QStringLiteral("org.kde.kglobalaccel"),
-                                QStringLiteral("/component/kmix"),
-                                QStringLiteral("org.kde.kglobalaccel.Component"),
-                                QDBusConnection::sessionBus());
-            kmix.call(QDBus::NoBlock, QStringLiteral("invokeShortcut"), QStringLiteral("mic_mute"));
-            Q_EMIT gestureTriggered(gestureType);
-        }
-    } else if (gestureType == QLatin1String("wave_up")) {
+    } else if (gestureType == QLatin1String("thumb_up") || gestureType == QLatin1String("wave_up")) {
         if (m_optVolumeGestures) {
             QDBusInterface kmix(QStringLiteral("org.kde.kglobalaccel"),
                                 QStringLiteral("/component/kmix"),
@@ -249,13 +240,30 @@ void SpatialPresencePlugin::onGestureDetected(const QString &gestureType)
             kmix.call(QDBus::NoBlock, QStringLiteral("invokeShortcut"), QStringLiteral("increase_volume"));
             Q_EMIT gestureTriggered(gestureType);
         }
-    } else if (gestureType == QLatin1String("wave_down")) {
+    } else if (gestureType == QLatin1String("thumb_down") || gestureType == QLatin1String("wave_down")) {
         if (m_optVolumeGestures) {
             QDBusInterface kmix(QStringLiteral("org.kde.kglobalaccel"),
                                 QStringLiteral("/component/kmix"),
                                 QStringLiteral("org.kde.kglobalaccel.Component"),
                                 QDBusConnection::sessionBus());
             kmix.call(QDBus::NoBlock, QStringLiteral("invokeShortcut"), QStringLiteral("decrease_volume"));
+            Q_EMIT gestureTriggered(gestureType);
+        }
+    } else if (gestureType == QLatin1String("palm_open") || gestureType == QLatin1String("media_play_pause")) {
+        // Control Multimedia: Pausar/Reanudar mpv, YouTube en navegador, Spotify vía MPRIS / mediacontrol
+        QDBusInterface media(QStringLiteral("org.kde.kglobalaccel"),
+                             QStringLiteral("/component/mediacontrol"),
+                             QStringLiteral("org.kde.kglobalaccel.Component"),
+                             QDBusConnection::sessionBus());
+        media.call(QDBus::NoBlock, QStringLiteral("invokeShortcut"), QStringLiteral("playpausemedia"));
+        Q_EMIT gestureTriggered(gestureType);
+    } else if (gestureType == QLatin1String("fist_hold") || gestureType == QLatin1String("palm_hold") || gestureType == QLatin1String("mic_mute")) {
+        if (m_optMicHoldGesture) {
+            QDBusInterface kmix(QStringLiteral("org.kde.kglobalaccel"),
+                                QStringLiteral("/component/kmix"),
+                                QStringLiteral("org.kde.kglobalaccel.Component"),
+                                QDBusConnection::sessionBus());
+            kmix.call(QDBus::NoBlock, QStringLiteral("invokeShortcut"), QStringLiteral("mic_mute"));
             Q_EMIT gestureTriggered(gestureType);
         }
     }
