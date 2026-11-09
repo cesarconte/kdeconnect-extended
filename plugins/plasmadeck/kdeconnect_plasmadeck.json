@@ -1,0 +1,25 @@
+{
+    "$schema": "../kdeconnect.schema.json",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "yugurta@gmail.com",
+                "Name": "Cesar"
+            }
+        ],
+        "Description": "Contextual Stream Deck touch companion and live hardware telemetry for your smartphone",
+        "Description[es]": "Botonera táctil contextual tipo Stream Deck y telemetría de hardware en tiempo real para tu smartphone",
+        "EnabledByDefault": true,
+        "Icon": "input-gaming",
+        "Name": "Plasma Deck",
+        "Name[es]": "Plasma Deck",
+        "ServiceTypes": [
+            "KdeConnect/Plugin"
+        ],
+        "Version": "1.0"
+    },
+    "X-KdeConnect-OutgoingPacketType": [
+        "kdeconnect.share.request"
+    ],
+    "X-KdeConnect-SupportedPacketType": []
+}
