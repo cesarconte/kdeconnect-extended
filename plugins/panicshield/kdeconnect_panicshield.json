@@ -13,9 +13,14 @@
         "Icon": "security-high",
         "License": "GPL",
         "Name": "Panic Shield / Privacy Mode",
-        "Name[es]": "Panic Shield / Modo Privacidad"
+        "Name[es]": "Panic Shield / Modo Privacidad",
+        "ServiceTypes": [
+            "KdeConnect/Plugin"
+        ],
+        "Version": "1.0"
     },
     "X-KdeConnect-OutgoingPacketType": [
+        "kdeconnect.ping",
         "kdeconnect.panicshield"
     ],
     "X-KdeConnect-SupportedPacketType": [

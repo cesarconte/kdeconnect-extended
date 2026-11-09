@@ -296,7 +296,15 @@ void PlasmaDeckPlugin::handleAction(const QString &actionId, const QString &cmd,
                                                           QStringLiteral("/modules/kdeconnect/devices/%1/panicshield").arg(device()->id()),
                                                           QStringLiteral("org.kde.kdeconnect.device.panicshield"),
                                                           QStringLiteral("togglePanicShield"));
-        QDBusConnection::sessionBus().send(msg);
+        QDBusReply<void> reply = QDBusConnection::sessionBus().call(msg);
+        if (!reply.isValid()) {
+            qWarning() << "Panic shield DBus call failed, executing direct Show Desktop fallback:" << reply.error().message();
+            QDBusInterface kwin(QStringLiteral("org.kde.kglobalaccel"),
+                                QStringLiteral("/component/kwin"),
+                                QStringLiteral("org.kde.kglobalaccel.Component"),
+                                QDBusConnection::sessionBus());
+            kwin.call(QDBus::NoBlock, QStringLiteral("invokeShortcut"), QStringLiteral("Show Desktop"));
+        }
     } else if (actionId == QLatin1String("screenshot")) {
         QProcess::startDetached(QStringLiteral("spectacle"), {QStringLiteral("-r")});
     } else if (actionId == QLatin1String("lock")) {
