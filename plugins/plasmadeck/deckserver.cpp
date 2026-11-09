@@ -605,6 +605,37 @@ QByteArray DeckServer::getIndexHtml() const
   .gesture-icon { font-size: 38px; filter: drop-shadow(0 2px 8px rgba(56,189,248,0.5)); }
   .gesture-label { font-size: 14px; font-weight: 700; color: #38bdf8; letter-spacing: -0.2px; }
 
+  /* MODAL SECURE CONTEXT */
+  .modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.78);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    padding: 20px;
+  }
+  .modal-content {
+    background: #141420;
+    border: 1px solid rgba(56, 189, 248, 0.4);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.8), 0 0 25px rgba(56, 189, 248, 0.2);
+    border-radius: 18px;
+    padding: 20px;
+    max-width: 380px;
+    width: 100%;
+    text-align: center;
+  }
+  .modal-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    justify-content: center;
+    color: #f0f0f5;
+  }
+
   .deck-grid {
     flex: 1;
     display: grid;
@@ -734,6 +765,30 @@ QByteArray DeckServer::getIndexHtml() const
 <div class="gesture-toast" id="gestureToast">
   <div class="gesture-icon" id="gestureToastIcon">➡️</div>
   <div class="gesture-label" id="gestureToastText">Siguiente Escritorio</div>
+</div>
+
+<div class="modal-overlay" id="secureNoticeModal" style="display:none;">
+  <div class="modal-content">
+    <div class="modal-header">
+      <span style="font-size: 26px;">🔒</span>
+      <h3>Autorizar Cámara Local</h3>
+    </div>
+    <p style="font-size: 13px; color: #cbd5e1; line-height: 1.5; margin: 12px 0;">
+      Los navegadores Chromium (como Brave o Chrome) bloquean la cámara en redes locales HTTP salvo que se autorice la IP en los ajustes internos del navegador:
+    </p>
+    <div style="background: rgba(0,0,0,0.4); padding: 10px; border-radius: 10px; font-size: 12px; margin-bottom: 12px; text-align: left; line-height: 1.6;">
+      <b>1.</b> Abre una nueva pestaña y escribe:<br>
+      <code style="color: #38bdf8; font-weight: bold;">brave://flags</code> (o <code style="color: #38bdf8; font-weight: bold;">chrome://flags</code>)<br>
+      <b>2.</b> Busca: <i>Insecure origins</i><br>
+      <b>3.</b> Cambia a <b>Enabled</b> y pega en el cuadro:<br>
+      <div style="display: flex; gap: 6px; margin-top: 6px;">
+        <input type="text" id="originUrlInput" readonly style="flex: 1; background: #1a1a28; color: #38bdf8; border: 1px solid rgba(56,189,248,0.4); border-radius: 6px; padding: 4px 8px; font-size: 11px;">
+        <button onclick="copyOriginUrl()" style="background: #38bdf8; color: #0a0a10; border: none; border-radius: 6px; padding: 4px 10px; font-weight: bold; font-size: 11px; cursor: pointer;">Copiar</button>
+      </div>
+      <b>4.</b> Pulsa el botón <b>Relaunch</b> (Reiniciar) al final de la pantalla.
+    </div>
+    <button onclick="document.getElementById('secureNoticeModal').style.display='none'" style="width: 100%; padding: 10px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 10px; font-weight: 600; cursor: pointer;">Entendido</button>
+  </div>
 </div>
 
 <div class="deck-grid" id="deckGrid">
@@ -939,8 +994,34 @@ QByteArray DeckServer::getIndexHtml() const
     }
   }
 
+  function showSecureContextNotice() {
+    const origin = window.location.protocol + '//' + window.location.host;
+    const input = document.getElementById('originUrlInput');
+    if (input) input.value = origin;
+    const modal = document.getElementById('secureNoticeModal');
+    if (modal) modal.style.display = 'flex';
+  }
+
+  function copyOriginUrl() {
+    const input = document.getElementById('originUrlInput');
+    if (!input) return;
+    input.select();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(input.value);
+    } else {
+      document.execCommand('copy');
+    }
+    alert('URL copiada al portapapeles: ' + input.value);
+  }
+
   async function startOpticalRadar() {
     try {
+      if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        document.getElementById('radarSwitch').checked = false;
+        showSecureContextNotice();
+        return;
+      }
+
       const constraints = {
         video: {
           facingMode: 'user',
