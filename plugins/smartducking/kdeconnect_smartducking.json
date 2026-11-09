@@ -1,0 +1,25 @@
+{
+    "$schema": "../kdeconnect.schema.json",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "yugurta@gmail.com",
+                "Name": "Cesar"
+            }
+        ],
+        "Description": "Smoothly attenuates PipeWire audio and applies voice isolation during incoming or active phone calls",
+        "Description[es]": "Atenúa suavemente el audio en PipeWire y aplica aislamiento de voz durante llamadas telefónicas entrantes o activas",
+        "EnabledByDefault": true,
+        "Icon": "audio-volume-low",
+        "Name": "Smart Ducking & Voice Isolation",
+        "Name[es]": "Atenuación Inteligente y Aislamiento de Voz",
+        "ServiceTypes": [
+            "KdeConnect/Plugin"
+        ],
+        "Version": "1.0"
+    },
+    "X-KdeConnect-OutgoingPacketType": [],
+    "X-KdeConnect-SupportedPacketType": [
+        "kdeconnect.telephony"
+    ]
+}

@@ -55,6 +55,7 @@ if(NOT APPLE AND NOT WIN32)
     add_subdirectory(continuitycamera)
     add_subdirectory(handoff)
     add_subdirectory(biometricauth)
+    add_subdirectory(smartducking)
 endif()
 
 # If we split notifications per plugin, in several notifyrc files, they won't
