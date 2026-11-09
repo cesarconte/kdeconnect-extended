@@ -65,6 +65,37 @@ private Q_SLOTS:
         QCOMPARE(match.iconName(), QStringLiteral("image-jpeg"));
         QCOMPARE(match.relevance(), 0.80);
     }
+
+    void testContactMatchConstruction()
+    {
+        KRunner::QueryMatch match;
+        QVariantMap contactData;
+        contactData[QStringLiteral("type")] = QStringLiteral("contact");
+        contactData[QStringLiteral("deviceId")] = QStringLiteral("f151e55ead63488c839b638f43e6d1ce");
+        contactData[QStringLiteral("name")] = QStringLiteral("Teresa");
+        contactData[QStringLiteral("phone")] = QStringLiteral("689-261-256");
+
+        match.setData(contactData);
+        match.setText(QStringLiteral("Teresa"));
+        match.setSubtext(QStringLiteral("📱 689-261-256 (Contacto · Redmi Note 14 Pro 5G)"));
+        match.setIconName(QStringLiteral("user-identity"));
+        match.setRelevance(0.90);
+
+        QCOMPARE(match.data().typeId(), QMetaType::QVariantMap);
+        QVariantMap extracted = match.data().toMap();
+        QCOMPARE(extracted.value(QStringLiteral("name")).toString(), QStringLiteral("Teresa"));
+        QCOMPARE(extracted.value(QStringLiteral("phone")).toString(), QStringLiteral("689-261-256"));
+        QCOMPARE(match.text(), QStringLiteral("Teresa"));
+        QCOMPARE(match.subtext(), QStringLiteral("📱 689-261-256 (Contacto · Redmi Note 14 Pro 5G)"));
+        QCOMPARE(match.iconName(), QStringLiteral("user-identity"));
+        QCOMPARE(match.relevance(), 0.90);
+
+        KRunner::Action smsAction(QStringLiteral("sms_contact"), QStringLiteral("view-conversation"), QStringLiteral("Enviar SMS"));
+        KRunner::Action callAction(QStringLiteral("call_contact"), QStringLiteral("call-start"), QStringLiteral("Llamar / Marcar teléfono"));
+        KRunner::Action copyAction(QStringLiteral("copy_contact"), QStringLiteral("edit-copy"), QStringLiteral("Copiar número"));
+        QList<KRunner::Action> contactActions = {smsAction, callAction, copyAction};
+        QCOMPARE(contactActions.count(), 3);
+    }
 };
 
 QTEST_MAIN(KRunnerMatchTest)

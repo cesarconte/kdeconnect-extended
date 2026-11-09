@@ -23,6 +23,8 @@ public:
 
 private:
     void searchRemoteFiles(KRunner::RunnerContext &context, const QString &deviceId, const QString &devName, const QString &searchTerm);
+    void searchContacts(KRunner::RunnerContext &context, const QString &deviceId, const QString &devName, const QString &searchTerm);
 
-    QList<KRunner::Action> m_actions;
+    QList<KRunner::Action> m_deviceActions;
+    QList<KRunner::Action> m_contactActions;
 };
