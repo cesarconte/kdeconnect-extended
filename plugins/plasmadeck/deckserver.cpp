@@ -444,6 +444,8 @@ QByteArray DeckServer::getIndexHtml() const
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0a0a10">
 <title>Plasma Deck</title>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
   body {
@@ -976,9 +978,150 @@ QByteArray DeckServer::getIndexHtml() const
   let palmCoverStartTime = 0;
   let currentCandidatePose = 'none';
   let currentPoseHold = 0;
+  let isGestureEngaged = false;
+  let lastTriggeredPose = 'none';
   let lastPresentTime = Date.now();
   let presenceState = 'present';
   let faceDetector = null;
+  let mpHands = null;
+  let isMediaPipeReady = false;
+
+  const poseLabels = {
+    pointing_left: '👈 Escritorio Izq',
+    pointing_right: '👉 Escritorio Der',
+    thumb_up: '👍 Volumen +',
+    thumb_down: '👎 Volumen -',
+    palm_open: '⏯️ Play / Pausa (Media)',
+    fist_hold: '🎙️ Silenciar Micrófono'
+  };
+
+  function initMediaPipe() {
+    if (typeof Hands !== 'undefined' && !mpHands) {
+      try {
+        mpHands = new Hands({
+          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+        });
+        mpHands.setOptions({
+          maxNumHands: 1,
+          modelComplexity: 0,
+          minDetectionConfidence: 0.6,
+          minTrackingConfidence: 0.6
+        });
+        mpHands.onResults(onMediaPipeResults);
+        isMediaPipeReady = true;
+        console.log('MediaPipe Hands initialized');
+      } catch (err) {
+        console.warn('MediaPipe init fallback:', err);
+        mpHands = null;
+        isMediaPipeReady = false;
+      }
+    }
+  }
+
+  function handleDetectedPose(detected) {
+    const feed = document.getElementById('feedGesture');
+
+    if (!detected || detected === 'none') {
+      currentCandidatePose = 'none';
+      currentPoseHold = 0;
+      isGestureEngaged = false;
+      feed.innerHTML = '🖐️ <b>Poses:</b> 👈 👉 Escritorios | 👍 👎 Vol | ✋ Media | ✊ Mic';
+      return;
+    }
+
+    if (detected === currentCandidatePose) {
+      currentPoseHold++;
+    } else {
+      currentCandidatePose = detected;
+      currentPoseHold = 1;
+      if (detected !== lastTriggeredPose) {
+        isGestureEngaged = false;
+      }
+    }
+
+    const pct = Math.min(100, Math.round((currentPoseHold / 4) * 100));
+    feed.innerHTML = '🖐️ <b>Pose:</b> <span style="color:#38bdf8">' + (poseLabels[detected] || detected) + ' (' + pct + '%)</span>';
+
+    if (currentPoseHold >= 4 && !isGestureEngaged) {
+      isGestureEngaged = true;
+      lastTriggeredPose = detected;
+
+      if (detected === 'pointing_left') {
+        showGestureToast('👈', 'Escritorio Anterior');
+        sendSpatialEvent('gesture', 'pointing_left');
+      } else if (detected === 'pointing_right') {
+        showGestureToast('👉', 'Siguiente Escritorio');
+        sendSpatialEvent('gesture', 'pointing_right');
+      } else if (detected === 'thumb_up') {
+        showGestureToast('👍', 'Volumen +');
+        sendSpatialEvent('gesture', 'thumb_up');
+      } else if (detected === 'thumb_down') {
+        showGestureToast('👎', 'Volumen -');
+        sendSpatialEvent('gesture', 'thumb_down');
+      } else if (detected === 'palm_open') {
+        showGestureToast('⏯️', 'Play / Pausa (YouTube / mpv)');
+        sendSpatialEvent('gesture', 'palm_open');
+      } else if (detected === 'fist_hold') {
+        showGestureToast('🎙️', 'Silenciar Micrófono');
+        sendSpatialEvent('gesture', 'fist_hold');
+      }
+    }
+  }
+
+  function onMediaPipeResults(results) {
+    const previewCanvas = document.getElementById('radarPreview');
+    const pctx = previewCanvas.getContext('2d');
+    const pw = previewCanvas.width;
+    const ph = previewCanvas.height;
+
+    pctx.save();
+    pctx.clearRect(0, 0, pw, ph);
+    pctx.drawImage(document.getElementById('radarVideo'), 0, 0, pw, ph);
+
+    if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+      pctx.restore();
+      handleDetectedPose('none');
+      return;
+    }
+
+    const lm = results.multiHandLandmarks[0];
+
+    pctx.fillStyle = '#38bdf8';
+    pctx.strokeStyle = '#38bdf8';
+    pctx.lineWidth = 1.5;
+    for (let i = 0; i < lm.length; i++) {
+      pctx.beginPath();
+      pctx.arc(lm[i].x * pw, lm[i].y * ph, 1.8, 0, 2 * Math.PI);
+      pctx.fill();
+    }
+    pctx.restore();
+
+    const dist = (i, j) => Math.hypot(lm[i].x - lm[j].x, lm[i].y - lm[j].y);
+
+    const isIndexExt = dist(8, 0) > dist(6, 0) * 1.25;
+    const isMiddleExt = dist(12, 0) > dist(10, 0) * 1.25;
+    const isRingExt = dist(16, 0) > dist(14, 0) * 1.25;
+    const isPinkyExt = dist(20, 0) > dist(18, 0) * 1.25;
+    const isThumbExt = dist(4, 2) > dist(3, 2) * 1.25;
+
+    let detected = 'none';
+
+    if (isIndexExt && isMiddleExt && isRingExt && isPinkyExt && isThumbExt) {
+      detected = 'palm_open';
+    } else if (!isIndexExt && !isMiddleExt && !isRingExt && !isPinkyExt && !isThumbExt) {
+      detected = 'fist_hold';
+    } else if (isThumbExt && !isIndexExt && !isMiddleExt && !isRingExt && !isPinkyExt && lm[4].y < lm[3].y && lm[4].y < lm[0].y) {
+      detected = 'thumb_up';
+    } else if (isThumbExt && !isIndexExt && !isMiddleExt && !isRingExt && !isPinkyExt && lm[4].y > lm[3].y && lm[4].y > lm[0].y) {
+      detected = 'thumb_down';
+    } else if (isIndexExt && !isMiddleExt && !isRingExt && !isPinkyExt && (lm[8].x - lm[5].x) > 0.08 && Math.abs(lm[8].x - lm[5].x) > Math.abs(lm[8].y - lm[5].y) * 1.2) {
+      detected = 'pointing_right';
+    } else if (isIndexExt && !isMiddleExt && !isRingExt && !isPinkyExt && (lm[5].x - lm[8].x) > 0.08 && Math.abs(lm[5].x - lm[8].x) > Math.abs(lm[8].y - lm[5].y) * 1.2) {
+      detected = 'pointing_left';
+    }
+
+    handleDetectedPose(detected);
+  }
 
   if ('FaceDetector' in window) {
     try {
@@ -1046,6 +1189,7 @@ QByteArray DeckServer::getIndexHtml() const
       presenceState = 'present';
       updateRadarPresenceUI('present', 'Atento / Presente');
 
+      initMediaPipe();
       processRadarFrame();
     } catch (err) {
       console.error('Error starting camera radar:', err);
@@ -1056,6 +1200,9 @@ QByteArray DeckServer::getIndexHtml() const
 
   function stopOpticalRadar() {
     radarRunning = false;
+    isGestureEngaged = false;
+    currentCandidatePose = 'none';
+    currentPoseHold = 0;
     if (radarAnimId) {
       cancelAnimationFrame(radarAnimId);
       radarAnimId = null;
@@ -1243,131 +1390,82 @@ QByteArray DeckServer::getIndexHtml() const
     }
 
     // 2. Detección Óptica de Poses Anatómicas (Estrategia B: Inmune a ida y vuelta)
-    // 👈 'pointing_left': Dedo índice a la izquierda -> Escritorio Anterior
-    // 👉 'pointing_right': Dedo índice a la derecha -> Siguiente Escritorio
-    // 👍 'thumb_up': Pulgar arriba -> Subir volumen
-    // 👎 'thumb_down': Pulgar abajo -> Bajar volumen
-    // ✋ 'palm_open': Palma abierta sostenida -> Play / Pausa Multimedia (YouTube, mpv)
-    // ✊ 'fist_hold': Puño cerrado sostenido -> Silenciar Micrófono
-
-    let minX = w, maxX = 0, minY = h, maxY = 0;
-    let handPixels = 0;
-    let handSumX = 0, handSumY = 0;
-
-    const rowCounts = new Uint16Array(h);
-    const colCounts = new Uint16Array(w);
-
-    for (let y = 0; y < h; y += 2) {
-      for (let x = 0; x < w; x += 2) {
-        const idx = (y * w + x) * 4;
-        const r = data[idx];
-        const g = data[idx + 1];
-        const b = data[idx + 2];
-        const luma = 0.299 * r + 0.587 * g + 0.114 * b;
-        const cb = 128 - 0.168736 * r - 0.331264 * g + 0.500 * b;
-        const cr = 128 + 0.500 * r - 0.418688 * g - 0.081312 * b;
-
-        if (luma > 35 && luma < 240 && cb >= 77 && cb <= 127 && cr >= 133 && cr <= 173) {
-          handPixels++;
-          handSumX += x;
-          handSumY += y;
-          if (x < minX) minX = x;
-          if (x > maxX) maxX = x;
-          if (y < minY) minY = y;
-          if (y > maxY) maxY = y;
-          rowCounts[y]++;
-          colCounts[x]++;
-        }
+    if (isMediaPipeReady && mpHands) {
+      try {
+        await mpHands.send({ image: video });
+      } catch (err) {
+        console.warn('mpHands frame error:', err);
       }
-    }
-
-    let detectedPose = 'none';
-
-    if (handPixels > 100) {
-      const handW = maxX - minX;
-      const handH = maxY - minY;
-      const cx = handSumX / handPixels;
-      const cy = handSumY / handPixels;
-      const ar = handW / (handH || 1);
-
-      // Dibujar caja de seguimiento en preview
-      prevCtx.strokeStyle = '#38bdf8';
-      prevCtx.lineWidth = 1.5;
-      prevCtx.strokeRect((minX / w) * previewCanvas.width, (minY / h) * previewCanvas.height, (handW / w) * previewCanvas.width, (handH / h) * previewCanvas.height);
-
-      let topCount = 0, bottomCount = 0;
-      for (let y = minY; y < minY + handH * 0.35; y += 2) topCount += rowCounts[y];
-      for (let y = maxY - handH * 0.35; y <= maxY; y += 2) bottomCount += rowCounts[y];
-
-      let leftCount = 0, rightCount = 0;
-      for (let x = minX; x < minX + handW * 0.35; x += 2) leftCount += colCounts[x];
-      for (let x = maxX - handW * 0.35; x <= maxX; x += 2) rightCount += colCounts[x];
-
-      if (handPixels > 450 && ar > 0.7 && ar < 1.4) {
-        detectedPose = 'palm_open';
-      } else if (handH > 32 && (cy - minY) > 1.25 * (maxY - cy) && topCount < bottomCount * 0.52) {
-        detectedPose = 'thumb_up';
-      } else if (handH > 32 && (maxY - cy) > 1.25 * (cy - minY) && bottomCount < topCount * 0.52) {
-        detectedPose = 'thumb_down';
-      } else if (handW > 35 && (cx - minX) > 1.25 * (maxX - cx) && leftCount < rightCount * 0.55) {
-        detectedPose = 'pointing_left';
-      } else if (handW > 35 && (maxX - cx) > 1.25 * (cx - minX) && rightCount < leftCount * 0.55) {
-        detectedPose = 'pointing_right';
-      } else if (handPixels >= 120 && handPixels <= 380 && ar > 0.75 && ar < 1.3) {
-        detectedPose = 'fist_hold';
-      }
-    }
-
-    // Feedback en vivo
-    const feed = document.getElementById('feedGesture');
-    const poseLabels = {
-      pointing_left: '👈 Escritorio Izq',
-      pointing_right: '👉 Escritorio Der',
-      thumb_up: '👍 Volumen +',
-      thumb_down: '👎 Volumen -',
-      palm_open: '⏯️ Play / Pausa (Media)',
-      fist_hold: '🎙️ Silenciar Micrófono'
-    };
-
-    if (detectedPose !== 'none') {
-      const pct = Math.min(100, Math.round((currentPoseHold / 5) * 100));
-      feed.innerHTML = '🖐️ <b>Pose:</b> <span style="color:#38bdf8">' + poseLabels[detectedPose] + ' (' + pct + '%)</span>';
     } else {
-      feed.innerHTML = '🖐️ <b>Poses:</b> 👈 👉 Escritorios | 👍 👎 Vol | ✋ Media | ✊ Mic';
-    }
+      // Fallback local: Aislar estrictamente la mano (descartando la cara)
+      // La cara del usuario está en el centro superior (y < h * 0.45).
+      // Solo buscamos mano en la parte media/inferior (y >= h * 0.35) con movimiento
+      let handPixels = 0, handSumX = 0, handSumY = 0;
+      let minX = w, maxX = 0, minY = h, maxY = 0;
+      const rowCounts = new Uint16Array(h);
+      const colCounts = new Uint16Array(w);
 
-    // Acumulador temporal para estabilidad (debe sostenerse 5 frames consecutivos ~250ms)
-    if (now > cooldownUntil) {
-      if (detectedPose !== 'none' && detectedPose === currentCandidatePose) {
-        currentPoseHold++;
-        if (currentPoseHold >= 5) {
-          if (detectedPose === 'pointing_left') {
-            showGestureToast('👈', 'Escritorio Anterior');
-            sendSpatialEvent('gesture', 'pointing_left');
-          } else if (detectedPose === 'pointing_right') {
-            showGestureToast('👉', 'Siguiente Escritorio');
-            sendSpatialEvent('gesture', 'pointing_right');
-          } else if (detectedPose === 'thumb_up') {
-            showGestureToast('👍', 'Volumen +');
-            sendSpatialEvent('gesture', 'thumb_up');
-          } else if (detectedPose === 'thumb_down') {
-            showGestureToast('👎', 'Volumen -');
-            sendSpatialEvent('gesture', 'thumb_down');
-          } else if (detectedPose === 'palm_open') {
-            showGestureToast('⏯️', 'Play / Pausa (YouTube / mpv)');
-            sendSpatialEvent('gesture', 'palm_open');
-          } else if (detectedPose === 'fist_hold') {
-            showGestureToast('🎙️', 'Silenciar Micrófono');
-            sendSpatialEvent('gesture', 'fist_hold');
+      for (let y = Math.floor(h * 0.35); y < h; y += 2) {
+        for (let x = 0; x < w; x += 2) {
+          const idx = (y * w + x) * 4;
+          const r = data[idx], g = data[idx + 1], b = data[idx + 2];
+          const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+          const cb = 128 - 0.168736 * r - 0.331264 * g + 0.500 * b;
+          const cr = 128 + 0.500 * r - 0.418688 * g - 0.081312 * b;
+
+          if (luma > 35 && luma < 240 && cb >= 77 && cb <= 127 && cr >= 133 && cr <= 173) {
+            const diff = prevGray ? Math.abs(luma - prevGray[y * w + x]) : 0;
+            if (diff > 16 || y > h * 0.55) {
+              handPixels++;
+              handSumX += x;
+              handSumY += y;
+              if (x < minX) minX = x;
+              if (x > maxX) maxX = x;
+              if (y < minY) minY = y;
+              if (y > maxY) maxY = y;
+              rowCounts[y]++;
+              colCounts[x]++;
+            }
           }
-          cooldownUntil = now + 800;
-          currentPoseHold = 0;
-          currentCandidatePose = 'none';
         }
-      } else {
-        currentCandidatePose = detectedPose;
-        currentPoseHold = 1;
       }
+
+      let detected = 'none';
+      if (handPixels > 110) {
+        const handW = maxX - minX;
+        const handH = maxY - minY;
+        const cx = handSumX / handPixels;
+        const cy = handSumY / handPixels;
+        const ar = handW / (handH || 1);
+
+        prevCtx.strokeStyle = '#38bdf8';
+        prevCtx.lineWidth = 1.5;
+        prevCtx.strokeRect((minX / w) * previewCanvas.width, (minY / h) * previewCanvas.height, (handW / w) * previewCanvas.width, (handH / h) * previewCanvas.height);
+
+        let topCount = 0, bottomCount = 0;
+        for (let y = minY; y < minY + handH * 0.35; y += 2) topCount += rowCounts[y];
+        for (let y = maxY - handH * 0.35; y <= maxY; y += 2) bottomCount += rowCounts[y];
+
+        let leftCount = 0, rightCount = 0;
+        for (let x = minX; x < minX + handW * 0.35; x += 2) leftCount += colCounts[x];
+        for (let x = maxX - handW * 0.35; x <= maxX; x += 2) rightCount += colCounts[x];
+
+        if (handPixels > 480 && ar > 0.75 && ar < 1.35) {
+          detected = 'palm_open';
+        } else if (handH > 35 && (cy - minY) > 1.3 * (maxY - cy) && topCount < bottomCount * 0.45) {
+          detected = 'thumb_up';
+        } else if (handH > 35 && (maxY - cy) > 1.3 * (cy - minY) && bottomCount < topCount * 0.45) {
+          detected = 'thumb_down';
+        } else if (handW > 35 && (cx - minX) > 1.3 * (maxX - cx) && leftCount < rightCount * 0.5) {
+          detected = 'pointing_left';
+        } else if (handW > 35 && (maxX - cx) > 1.3 * (cx - minX) && rightCount < leftCount * 0.5) {
+          detected = 'pointing_right';
+        } else if (handPixels >= 130 && handPixels <= 350 && ar > 0.8 && ar < 1.25) {
+          detected = 'fist_hold';
+        }
+      }
+
+      handleDetectedPose(detected);
     }
 
     radarAnimId = requestAnimationFrame(processRadarFrame);
