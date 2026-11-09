@@ -202,8 +202,12 @@ void BiometricAuthPlugin::handleSocketData()
     req.set<qint64>(QStringLiteral("timestamp"), QDateTime::currentMSecsSinceEpoch());
     sendPacket(req);
 
-    // Enviar vibración háptica al dispositivo
+    // Enviar vibración háptica y notificación nativa en Android con los detalles del comando
     NetworkPacket ping(PACKET_TYPE_PING);
+    const QString cmdDisplay = !m_currentCommand.isEmpty() ? m_currentCommand : service;
+    const QString pingMsg =
+        i18n("🔑 Dual-Key: Autorización Requerida [%1]\nComando: %2\nAbre 'Ejecutar órdenes' para Aprobar", m_currentRiskLevel.toUpper(), cmdDisplay);
+    ping.set(QStringLiteral("message"), pingMsg);
     sendPacket(ping);
 
     // Enviar notificación visible al móvil (en pantalla bloqueada y barra de notificaciones)
@@ -278,6 +282,11 @@ void BiometricAuthPlugin::handleAuthTimeout()
 
     m_isPending = false;
     cancelMobileNotification();
+
+    NetworkPacket timeoutPing(PACKET_TYPE_PING);
+    timeoutPing.set(QStringLiteral("message"), i18n("⌛ Dual-Key: Tiempo de autorización agotado"));
+    sendPacket(timeoutPing);
+
     sendResponseToPam(QStringLiteral("timeout"), i18n("Tiempo límite de autenticación agotado"));
     Q_EMIT authenticationFinished(false);
 
@@ -298,6 +307,10 @@ void BiometricAuthPlugin::respondBiometric(bool accepted)
     m_timeoutTimer.stop();
     m_isPending = false;
     cancelMobileNotification();
+
+    NetworkPacket resPing(PACKET_TYPE_PING);
+    resPing.set(QStringLiteral("message"), accepted ? i18n("✓ Dual-Key: Operación autorizada con éxito") : i18n("✕ Dual-Key: Operación rechazada"));
+    sendPacket(resPing);
 
     if (accepted) {
         sendResponseToPam(QStringLiteral("success"), i18n("Autenticado biométricamente con éxito"));
@@ -354,6 +367,10 @@ QString BiometricAuthPlugin::requestAuthorization(const QString &service, const 
     sendPacket(req);
 
     NetworkPacket ping(PACKET_TYPE_PING);
+    const QString cmdDisplay = !m_currentCommand.isEmpty() ? m_currentCommand : service;
+    const QString pingMsg =
+        i18n("🔑 Dual-Key: Autorización Requerida [%1]\nComando: %2\nAbre 'Ejecutar órdenes' para Aprobar", m_currentRiskLevel.toUpper(), cmdDisplay);
+    ping.set(QStringLiteral("message"), pingMsg);
     sendPacket(ping);
 
     sendMobileNotification(service, m_currentCommand, m_currentRiskLevel);
