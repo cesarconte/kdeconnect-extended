@@ -57,6 +57,8 @@ private:
     void registerRunCommand();
     bool triggerDolphinAction(const QString &actionName);
     void sendKeyShortcut(const QString &key, int specialKey = 0, bool ctrl = false, bool alt = false, bool shift = false, bool super = false);
+    void setupKWinWindowTracker();
+    void cleanupKWinWindowTracker();
 
     DeckServer m_server;
     QTimer m_telemetryTimer;
@@ -68,4 +70,5 @@ private:
     QString m_activeApp = QStringLiteral("Plasma");
     QString m_windowTitle;
     QString m_hostIp;
+    QString m_trackerPluginName;
 };

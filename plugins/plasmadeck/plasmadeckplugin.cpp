@@ -46,18 +46,22 @@ PlasmaDeckPlugin::PlasmaDeckPlugin(QObject *parent, const QVariantList &args)
     readCpuStats(m_prevWorkTime, m_prevTotalTime);
     updateTelemetry();
 
+    setupKWinWindowTracker();
+
     m_telemetryTimer.start(1500);
-    m_windowPollTimer.start(1000);
+    m_windowPollTimer.start(2000);
 }
 
 PlasmaDeckPlugin::~PlasmaDeckPlugin()
 {
+    cleanupKWinWindowTracker();
     m_server.stop();
 }
 
 void PlasmaDeckPlugin::connected()
 {
     registerRunCommand();
+    setupKWinWindowTracker();
 }
 
 QString PlasmaDeckPlugin::dbusPath() const
@@ -126,10 +130,88 @@ void PlasmaDeckPlugin::updateTelemetry()
 
 void PlasmaDeckPlugin::checkActiveWindow()
 {
-    // Consultar KWin o servicios activos para deducir ventana en primer plano
-    QDBusInterface kwinIface(QStringLiteral("org.kde.KWin"), QStringLiteral("/KWin"), QStringLiteral("org.kde.KWin"), QDBusConnection::sessionBus());
-    if (kwinIface.isValid()) {
-        // En KDE 6 Wayland, comprobar si KWin tiene la propiedad activa
+    if (m_trackerPluginName.isEmpty()) {
+        setupKWinWindowTracker();
+        return;
+    }
+
+    QDBusInterface scripting(QStringLiteral("org.kde.KWin"),
+                             QStringLiteral("/Scripting"),
+                             QStringLiteral("org.kde.kwin.Scripting"),
+                             QDBusConnection::sessionBus());
+    if (scripting.isValid()) {
+        QDBusReply<bool> loaded = scripting.call(QStringLiteral("isScriptLoaded"), m_trackerPluginName);
+        if (!loaded.isValid() || !loaded.value()) {
+            setupKWinWindowTracker();
+        }
+    }
+}
+
+void PlasmaDeckPlugin::setupKWinWindowTracker()
+{
+    m_trackerPluginName = QStringLiteral("plasmadeck_tracker_%1").arg(device()->id());
+
+    QDBusInterface scripting(QStringLiteral("org.kde.KWin"),
+                             QStringLiteral("/Scripting"),
+                             QStringLiteral("org.kde.kwin.Scripting"),
+                             QDBusConnection::sessionBus());
+    if (!scripting.isValid()) {
+        return;
+    }
+
+    // Si ya estuviese cargado de una sesión previa, descargarlo
+    scripting.call(QStringLiteral("unloadScript"), m_trackerPluginName);
+
+    const QString path = dbusPath();
+    const QString scriptContent =
+        QStringLiteral(
+            "if (workspace.activeWindow) {\n"
+            "    var c = workspace.activeWindow;\n"
+            "    callDBus('org.kde.kdeconnect', '%1', 'org.kde.kdeconnect.device.plasmadeck', 'onActiveWindowChanged', c.resourceClass || c.desktopFileName || "
+            "'', c.caption || '');\n"
+            "}\n"
+            "workspace.windowActivated.connect(function(client) {\n"
+            "    if (client) {\n"
+            "        var cls = client.resourceClass || client.desktopFileName || '';\n"
+            "        var title = client.caption || '';\n"
+            "        callDBus('org.kde.kdeconnect', '%1', 'org.kde.kdeconnect.device.plasmadeck', 'onActiveWindowChanged', cls, title);\n"
+            "    }\n"
+            "});\n")
+            .arg(path);
+
+    const QString scriptPath = QDir::tempPath() + QStringLiteral("/plasmadeck_%1.js").arg(device()->id());
+    QFile f(scriptPath);
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        return;
+    }
+    f.write(scriptContent.toUtf8());
+    f.close();
+
+    QDBusReply<int> reply = scripting.call(QStringLiteral("loadScript"), scriptPath, m_trackerPluginName);
+    if (reply.isValid() && reply.value() >= 0) {
+        int scriptId = reply.value();
+        QDBusInterface scriptObj(QStringLiteral("org.kde.KWin"),
+                                 QStringLiteral("/Scripting/Script%1").arg(scriptId),
+                                 QStringLiteral("org.kde.kwin.Script"),
+                                 QDBusConnection::sessionBus());
+        if (scriptObj.isValid()) {
+            scriptObj.call(QStringLiteral("run"));
+        }
+    }
+}
+
+void PlasmaDeckPlugin::cleanupKWinWindowTracker()
+{
+    if (m_trackerPluginName.isEmpty()) {
+        return;
+    }
+
+    QDBusInterface scripting(QStringLiteral("org.kde.KWin"),
+                             QStringLiteral("/Scripting"),
+                             QStringLiteral("org.kde.kwin.Scripting"),
+                             QDBusConnection::sessionBus());
+    if (scripting.isValid()) {
+        scripting.call(QStringLiteral("unloadScript"), m_trackerPluginName);
     }
 }
 

@@ -541,11 +541,11 @@ QByteArray DeckServer::getIndexHtml() const
       return;
     }
 
-    if (lower.includes('code') || lower.includes('kate') || lower.includes('nvim') || lower.includes('idea')) {
+    if (lower.includes('code') || lower.includes('kate') || lower.includes('nvim') || lower.includes('idea') || lower.includes('konsole') || lower.includes('terminal')) {
       renderGrid(defaultProfiles.code);
-    } else if (lower.includes('dolphin') || lower.includes('nautilus') || lower.includes('file')) {
+    } else if (lower.includes('dolphin') || lower.includes('nautilus') || lower.includes('file') || lower.includes('ark')) {
       renderGrid(defaultProfiles.files);
-    } else if (lower.includes('firefox') || lower.includes('chrome') || lower.includes('brave') || lower.includes('edge')) {
+    } else if (lower.includes('firefox') || lower.includes('chrome') || lower.includes('brave') || lower.includes('edge') || lower.includes('zen') || lower.includes('chromium') || lower.includes('browser')) {
       renderGrid(defaultProfiles.web);
     } else {
       renderGrid(defaultProfiles.system);
@@ -563,7 +563,14 @@ QByteArray DeckServer::getIndexHtml() const
           document.getElementById('ramVal').textContent = data.ram + '%';
           document.getElementById('tempVal').textContent = data.temp + '°C';
         } else if (data.type === 'context') {
-          document.getElementById('appName').textContent = data.app || 'Plasma';
+          let name = data.app || 'Plasma';
+          if (name.includes('.')) {
+            name = name.split('.').pop();
+          }
+          if (name.length > 0) {
+            name = name.charAt(0).toUpperCase() + name.slice(1);
+          }
+          document.getElementById('appName').textContent = name || 'Plasma';
           if (data.buttons && data.buttons.length > 0) {
             sseButtons = data.buttons;
           } else {
