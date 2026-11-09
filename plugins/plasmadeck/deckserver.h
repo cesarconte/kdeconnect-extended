@@ -6,10 +6,12 @@
 
 #pragma once
 
+#include <QHostAddress>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QList>
 #include <QObject>
+#include <QStringList>
 #include <QTcpServer>
 #include <QTcpSocket>
 
@@ -26,6 +28,12 @@ public:
     quint16 port() const;
     QString serverUrl(const QString &hostIp) const;
 
+    QString authToken() const;
+    void setAuthToken(const QString &token);
+
+    QStringList allowedAddresses() const;
+    void setAllowedAddresses(const QStringList &addresses);
+
     void broadcastTelemetry(int cpuPercent, int ramPercent, int tempC);
     void broadcastContext(const QString &appName, const QString &windowTitle, const QJsonArray &buttons);
 
@@ -39,12 +47,17 @@ private Q_SLOTS:
 
 private:
     void handleHttpRequest(QTcpSocket *socket, const QByteArray &data);
-    void sendResponse(QTcpSocket *socket, int statusCode, const QString &contentType, const QByteArray &body);
+    void sendResponse(QTcpSocket *socket, int statusCode, const QString &contentType, const QByteArray &body, const QString &origin = QString());
+    bool isRequestAuthorized(QTcpSocket *socket, const QString &path, const QString &reqHeaders, const QByteArray &body) const;
+    bool isClientIpAllowed(const QHostAddress &addr) const;
     QByteArray getIndexHtml() const;
 
     QTcpServer m_server;
     quint16 m_port;
     QList<QTcpSocket *> m_sseClients;
+
+    QString m_authToken;
+    QStringList m_allowedAddresses;
 
     int m_lastCpu = 0;
     int m_lastRam = 0;

@@ -18,6 +18,7 @@
 #include <QFile>
 #include <QHostAddress>
 #include <QNetworkInterface>
+#include <QRandomGenerator>
 #include <QSettings>
 #include <QTextStream>
 #include <sys/sysinfo.h>
@@ -34,6 +35,14 @@ PlasmaDeckPlugin::PlasmaDeckPlugin(QObject *parent, const QVariantList &args)
     , m_server(1739, this)
 {
     m_hostIp = findBestHostIp();
+
+    // Generar token criptográfico efímero de 128 bits
+    const QString token = QString::fromLatin1(QByteArray::number(QRandomGenerator::global()->generate64(), 16)
+                                              + QByteArray::number(QRandomGenerator::global()->generate64(), 16));
+    m_server.setAuthToken(token);
+    if (device()) {
+        m_server.setAllowedAddresses(device()->reachableAddresses());
+    }
 
     connect(&m_server, &DeckServer::actionTriggered, this, &PlasmaDeckPlugin::handleAction);
 
@@ -62,6 +71,9 @@ void PlasmaDeckPlugin::connected()
 {
     registerRunCommand();
     setupKWinWindowTracker();
+    if (device()) {
+        m_server.setAllowedAddresses(device()->reachableAddresses());
+    }
 }
 
 QString PlasmaDeckPlugin::dbusPath() const
@@ -76,7 +88,7 @@ bool PlasmaDeckPlugin::isServerRunning() const
 
 QString PlasmaDeckPlugin::deckUrl() const
 {
-    return QStringLiteral("http://%1:1739/").arg(m_hostIp);
+    return m_server.serverUrl(m_hostIp);
 }
 
 QString PlasmaDeckPlugin::activeApp() const

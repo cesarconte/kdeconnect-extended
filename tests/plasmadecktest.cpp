@@ -78,6 +78,69 @@ private Q_SLOTS:
 
         server.stop();
     }
+
+    void testAuthSecurity()
+    {
+        DeckServer server(54332);
+        server.setAuthToken(QStringLiteral("secr3t_t0k3n"));
+        QVERIFY(server.start());
+
+        // 1. Petición sin token debe rechazarse con 401
+        {
+            QTcpSocket client;
+            client.connectToHost(QStringLiteral("127.0.0.1"), 54332);
+            QVERIFY(client.waitForConnected(2000));
+            QTest::qWait(50);
+
+            client.write("GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
+            client.flush();
+            QTest::qWait(50);
+
+            QTRY_VERIFY_WITH_TIMEOUT(client.bytesAvailable() > 0, 2000);
+            QByteArray resp = client.readAll();
+            QVERIFY(resp.startsWith("HTTP/1.1 401 Unauthorized"));
+        }
+
+        // 2. Petición con token en query debe aceptarse con 200 y Set-Cookie
+        {
+            QTcpSocket client;
+            client.connectToHost(QStringLiteral("127.0.0.1"), 54332);
+            QVERIFY(client.waitForConnected(2000));
+            QTest::qWait(50);
+
+            client.write("GET /?token=secr3t_t0k3n HTTP/1.1\r\nHost: localhost\r\n\r\n");
+            client.flush();
+            QTest::qWait(50);
+
+            QTRY_VERIFY_WITH_TIMEOUT(client.bytesAvailable() > 0, 2000);
+            QByteArray resp = client.readAll();
+            QVERIFY(resp.startsWith("HTTP/1.1 200 OK"));
+            QVERIFY(resp.contains("Set-Cookie: deck_token=secr3t_t0k3n"));
+        }
+
+        // 3. Petición de acción con cabecera X-Deck-Token
+        {
+            QSignalSpy spy(&server, &DeckServer::actionTriggered);
+            QTcpSocket client;
+            client.connectToHost(QStringLiteral("127.0.0.1"), 54332);
+            QVERIFY(client.waitForConnected(2000));
+            QTest::qWait(50);
+
+            QJsonObject actionObj;
+            actionObj[QStringLiteral("id")] = QStringLiteral("lock");
+            QByteArray body = QJsonDocument(actionObj).toJson(QJsonDocument::Compact);
+
+            QByteArray req =
+                "POST /api/action HTTP/1.1\r\nX-Deck-Token: secr3t_t0k3n\r\nContent-Length: " + QByteArray::number(body.size()) + "\r\n\r\n" + body;
+            client.write(req);
+            client.flush();
+            QTest::qWait(50);
+
+            QTRY_COMPARE_WITH_TIMEOUT(spy.count(), 1, 2000);
+        }
+
+        server.stop();
+    }
 };
 
 QTEST_MAIN(PlasmaDeckTest)

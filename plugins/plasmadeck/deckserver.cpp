@@ -10,6 +10,9 @@
 #include <QDebug>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QRandomGenerator>
+#include <QUrl>
+#include <QUrlQuery>
 
 DeckServer::DeckServer(quint16 port, QObject *parent)
     : QObject(parent)
@@ -58,9 +61,100 @@ quint16 DeckServer::port() const
     return m_port;
 }
 
+QString DeckServer::authToken() const
+{
+    return m_authToken;
+}
+
+void DeckServer::setAuthToken(const QString &token)
+{
+    m_authToken = token;
+}
+
+QStringList DeckServer::allowedAddresses() const
+{
+    return m_allowedAddresses;
+}
+
+void DeckServer::setAllowedAddresses(const QStringList &addresses)
+{
+    m_allowedAddresses = addresses;
+}
+
 QString DeckServer::serverUrl(const QString &hostIp) const
 {
-    return QStringLiteral("http://%1:%2/").arg(hostIp).arg(m_port);
+    if (m_authToken.isEmpty()) {
+        return QStringLiteral("http://%1:%2/").arg(hostIp).arg(m_port);
+    }
+    return QStringLiteral("http://%1:%2/?token=%3").arg(hostIp).arg(m_port).arg(m_authToken);
+}
+
+bool DeckServer::isClientIpAllowed(const QHostAddress &addr) const
+{
+    if (m_allowedAddresses.isEmpty()) {
+        return true;
+    }
+
+    // Permitir siempre localhost
+    if (addr == QHostAddress::LocalHost || addr == QHostAddress::LocalHostIPv6 || addr == QHostAddress(QStringLiteral("127.0.0.1"))
+        || addr == QHostAddress(QStringLiteral("::1"))) {
+        return true;
+    }
+
+    const QString clientIpStr = addr.toString();
+    for (const auto &allowed : m_allowedAddresses) {
+        if (allowed.isEmpty()) {
+            continue;
+        }
+        if (addr == QHostAddress(allowed) || clientIpStr.endsWith(allowed)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool DeckServer::isRequestAuthorized(QTcpSocket *socket, const QString &path, const QString &reqHeaders, const QByteArray &body) const
+{
+    Q_UNUSED(socket)
+    if (m_authToken.isEmpty()) {
+        return true;
+    }
+
+    // 1. Query parameter
+    QUrl url(path);
+    QUrlQuery query(url);
+    if (query.hasQueryItem(QStringLiteral("token")) && query.queryItemValue(QStringLiteral("token")) == m_authToken) {
+        return true;
+    }
+
+    // 2. Cabecera personalizada X-Deck-Token
+    const QString tokenHeader = QStringLiteral("X-Deck-Token: %1").arg(m_authToken);
+    if (reqHeaders.contains(tokenHeader, Qt::CaseInsensitive)) {
+        return true;
+    }
+
+    // 3. Authorization Bearer
+    const QString bearerHeader = QStringLiteral("Authorization: Bearer %1").arg(m_authToken);
+    if (reqHeaders.contains(bearerHeader, Qt::CaseInsensitive)) {
+        return true;
+    }
+
+    // 4. Cookie de sesión
+    const QString cookieToken = QStringLiteral("deck_token=%1").arg(m_authToken);
+    if (reqHeaders.contains(cookieToken)) {
+        return true;
+    }
+
+    // 5. Cuerpo JSON
+    if (!body.isEmpty()) {
+        QJsonDocument doc = QJsonDocument::fromJson(body);
+        if (doc.isObject() && doc.object().value(QStringLiteral("token")).toString() == m_authToken) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 void DeckServer::onNewConnection()
@@ -104,6 +198,12 @@ void DeckServer::handleHttpRequest(QTcpSocket *socket, const QByteArray &data)
         return;
     }
 
+    // 1. Validación de IP
+    if (!isClientIpAllowed(socket->peerAddress())) {
+        sendResponse(socket, 403, QStringLiteral("text/plain"), "403 Forbidden: IP no autorizada");
+        return;
+    }
+
     const QString req = QString::fromUtf8(data);
     const QString firstLine = req.section(QLatin1Char('\n'), 0, 0).trimmed();
     const QStringList parts = firstLine.split(QLatin1Char(' '));
@@ -114,34 +214,62 @@ void DeckServer::handleHttpRequest(QTcpSocket *socket, const QByteArray &data)
     const QString method = parts[0];
     const QString path = parts[1];
 
+    int bodyIdx = data.indexOf("\r\n\r\n");
+    if (bodyIdx == -1) {
+        bodyIdx = data.indexOf("\n\n");
+    }
+    const QString reqHeaders = (bodyIdx != -1) ? QString::fromUtf8(data.left(bodyIdx)) : req;
+    const QByteArray body = (bodyIdx != -1) ? data.mid(bodyIdx + ((data.contains("\r\n\r\n")) ? 4 : 2)) : QByteArray();
+
+    // Extraer origen para protección CORS / CSRF
+    QString originHeader;
+    const auto headerLines = reqHeaders.split(QLatin1Char('\n'));
+    for (const auto &h : headerLines) {
+        if (h.startsWith(QLatin1String("Origin:"), Qt::CaseInsensitive)) {
+            originHeader = h.section(QLatin1Char(':'), 1).trimmed();
+            break;
+        }
+    }
+
     if (method == QLatin1String("OPTIONS")) {
-        QByteArray resp =
-            "HTTP/1.1 204 No Content\r\n"
-            "Access-Control-Allow-Origin: *\r\n"
-            "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
-            "Access-Control-Allow-Headers: Content-Type\r\n"
-            "Connection: close\r\n\r\n";
-        socket->write(resp);
-        socket->flush();
-        socket->disconnectFromHost();
+        sendResponse(socket, 204, QStringLiteral("text/plain"), QByteArray(), originHeader);
+        return;
+    }
+
+    // 2. Validación de Token Criptográfico
+    if (!isRequestAuthorized(socket, path, reqHeaders, body)) {
+        sendResponse(socket,
+                     401,
+                     QStringLiteral("text/html; charset=utf-8"),
+                     "<!DOCTYPE html><html><body style='background:#0a0a10;color:#f87171;font-family:sans-serif;text-align:center;padding:50px;'>"
+                     "<h2>401 No Autorizado</h2><p style='color:#8e8e9f'>Token de seguridad de Plasma Deck no proporcionado o inválido.</p>"
+                     "</body></html>",
+                     originHeader);
         return;
     }
 
     if ((method == QLatin1String("GET") || method == QLatin1String("HEAD"))
         && (path == QLatin1String("/") || path == QLatin1String("/index.html") || path.startsWith(QLatin1String("/?"))
             || path.startsWith(QLatin1String("/index.html?")))) {
-        sendResponse(socket, 200, QStringLiteral("text/html; charset=utf-8"), (method == QLatin1String("HEAD")) ? QByteArray() : getIndexHtml());
+        sendResponse(socket, 200, QStringLiteral("text/html; charset=utf-8"), (method == QLatin1String("HEAD")) ? QByteArray() : getIndexHtml(), originHeader);
         return;
     }
 
-    if (method == QLatin1String("GET") && path == QLatin1String("/api/events")) {
+    if (method == QLatin1String("GET") && (path == QLatin1String("/api/events") || path.startsWith(QLatin1String("/api/events?")))) {
         // Registrar cliente Server-Sent Events (SSE)
         QByteArray sseHeader =
             "HTTP/1.1 200 OK\r\n"
             "Content-Type: text/event-stream\r\n"
             "Cache-Control: no-cache\r\n"
-            "Connection: keep-alive\r\n"
-            "Access-Control-Allow-Origin: *\r\n\r\n";
+            "Connection: keep-alive\r\n";
+        if (!originHeader.isEmpty()) {
+            if (originHeader.contains(QStringLiteral("localhost")) || originHeader.contains(QStringLiteral("127.0.0.1"))
+                || originHeader.contains(QString::number(m_port))) {
+                sseHeader += "Access-Control-Allow-Origin: " + originHeader.toUtf8() + "\r\n";
+                sseHeader += "Access-Control-Allow-Credentials: true\r\n";
+            }
+        }
+        sseHeader += "\r\n";
         socket->write(sseHeader);
         socket->flush();
 
@@ -170,12 +298,6 @@ void DeckServer::handleHttpRequest(QTcpSocket *socket, const QByteArray &data)
     }
 
     if (method == QLatin1String("POST") && path == QLatin1String("/api/action")) {
-        int bodyIdx = data.indexOf("\r\n\r\n");
-        if (bodyIdx == -1) {
-            bodyIdx = data.indexOf("\n\n");
-        }
-
-        QByteArray body = (bodyIdx != -1) ? data.mid(bodyIdx + 4) : QByteArray();
         QJsonDocument doc = QJsonDocument::fromJson(body);
         if (doc.isObject()) {
             QJsonObject obj = doc.object();
@@ -186,26 +308,47 @@ void DeckServer::handleHttpRequest(QTcpSocket *socket, const QByteArray &data)
         }
 
         QByteArray resp = "{\"status\":\"ok\"}";
-        sendResponse(socket, 200, QStringLiteral("application/json"), resp);
+        sendResponse(socket, 200, QStringLiteral("application/json"), resp, originHeader);
         return;
     }
 
     // 404 por defecto
-    sendResponse(socket, 404, QStringLiteral("text/plain"), "Not Found");
+    sendResponse(socket, 404, QStringLiteral("text/plain"), "Not Found", originHeader);
 }
 
-void DeckServer::sendResponse(QTcpSocket *socket, int statusCode, const QString &contentType, const QByteArray &body)
+void DeckServer::sendResponse(QTcpSocket *socket, int statusCode, const QString &contentType, const QByteArray &body, const QString &origin)
 {
-    QString statusText = (statusCode == 200) ? QStringLiteral("OK") : QStringLiteral("Not Found");
+    QString statusText = (statusCode == 200) ? QStringLiteral("OK")
+        : (statusCode == 204)                ? QStringLiteral("No Content")
+        : (statusCode == 401)                ? QStringLiteral("Unauthorized")
+        : (statusCode == 403)                ? QStringLiteral("Forbidden")
+                                             : QStringLiteral("Not Found");
     QByteArray header;
     header.append(QStringLiteral("HTTP/1.1 %1 %2\r\n").arg(statusCode).arg(statusText).toUtf8());
     header.append(QStringLiteral("Content-Type: %1\r\n").arg(contentType).toUtf8());
     header.append(QStringLiteral("Content-Length: %1\r\n").arg(body.size()).toUtf8());
-    header.append("Access-Control-Allow-Origin: *\r\n");
+
+    // Token Session Cookie (SameSite=Strict, HttpOnly)
+    if (!m_authToken.isEmpty() && statusCode == 200) {
+        header.append(QStringLiteral("Set-Cookie: deck_token=%1; Path=/; SameSite=Strict; HttpOnly\r\n").arg(m_authToken).toUtf8());
+    }
+
+    // CORS Estricto: Solo permitir localhost o nuestro propio host/puerto
+    if (!origin.isEmpty()) {
+        if (origin.contains(QStringLiteral("localhost")) || origin.contains(QStringLiteral("127.0.0.1")) || origin.contains(QString::number(m_port))) {
+            header.append(QStringLiteral("Access-Control-Allow-Origin: %1\r\n").arg(origin).toUtf8());
+            header.append("Access-Control-Allow-Credentials: true\r\n");
+            header.append("Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n");
+            header.append("Access-Control-Allow-Headers: Content-Type, X-Deck-Token, Authorization\r\n");
+        }
+    }
+
     header.append("Connection: close\r\n\r\n");
 
     socket->write(header);
-    socket->write(body);
+    if (!body.isEmpty()) {
+        socket->write(body);
+    }
     socket->flush();
     socket->disconnectFromHost();
 }
@@ -445,6 +588,9 @@ QByteArray DeckServer::getIndexHtml() const
   let currentContextApp = 'system';
   let sseButtons = [];
 
+  const urlParams = new URLSearchParams(window.location.search);
+  const deckToken = urlParams.get('token') || '';
+
   const defaultProfiles = {
     code: [
       { id: "build", icon: "🔨", title: "Compilar", sub: "CMake/Ninja", cmd: "build" },
@@ -508,10 +654,14 @@ QByteArray DeckServer::getIndexHtml() const
     if (navigator.vibrate) {
       navigator.vibrate(25);
     }
-    fetch('/api/action', {
+    const payload = Object.assign({}, btn, { token: deckToken });
+    fetch('/api/action' + (deckToken ? ('?token=' + encodeURIComponent(deckToken)) : ''), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(btn)
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Deck-Token': deckToken
+      },
+      body: JSON.stringify(payload)
     }).catch(err => console.error(err));
   }
 
@@ -554,7 +704,8 @@ QByteArray DeckServer::getIndexHtml() const
 
   // Server-Sent Events (SSE)
   function connectSSE() {
-    const es = new EventSource('/api/events');
+    const sseUrl = deckToken ? ('/api/events?token=' + encodeURIComponent(deckToken)) : '/api/events';
+    const es = new EventSource(sseUrl);
     es.onmessage = (e) => {
       try {
         const data = JSON.parse(e.data);
