@@ -989,8 +989,10 @@ QByteArray DeckServer::getIndexHtml() const
   let mpFace = null;
   let isMediaPipeFaceReady = false;
   let lastFaceCheckTime = 0;
-  let lastFaceSeenTimestamp = Date.now();
-  let isFaceCurrentlyVisible = true;
+  let lastAttentiveTimestamp = Date.now();
+  let facePresenceConfidence = 0;
+  let currentAttentionState = 'present'; // 'present', 'looking_away', 'absent'
+  let lastFaceBox = null;
   let absentSent = false;
   let dimmedSent = false;
   let lockedSent = false;
@@ -1004,6 +1006,61 @@ QByteArray DeckServer::getIndexHtml() const
     fist_hold: '🎙️ Silenciar Micrófono'
   };
 
+  function checkFaceAttention(det) {
+    const lm = det.landmarks || (det.locationData && (det.locationData.relativeKeypoints || det.locationData.relative_keypoints));
+    if (!lm || lm.length < 4) {
+      return { attentive: true, reason: 'frontal' };
+    }
+
+    const rEye = lm[0];
+    const lEye = lm[1];
+    const nose = lm[2];
+    const mouth = lm[3];
+
+    // 1. Distancia horizontal entre ojos (si es demasiado corta, la cara está muy de perfil)
+    const eyeDx = Math.abs(lEye.x - rEye.x);
+    if (eyeDx < 0.04) {
+      return { attentive: false, reason: 'looking_away_profile' };
+    }
+
+    // 2. Yaw (posición relativa de la nariz entre los ojos)
+    const minEyeX = Math.min(rEye.x, lEye.x);
+    const maxEyeX = Math.max(rEye.x, lEye.x);
+    const eyeSpan = maxEyeX - minEyeX;
+    if (eyeSpan > 0.035) {
+      const noseRatio = (nose.x - minEyeX) / eyeSpan;
+      // Cuando mira hacia la pantalla / frente: 0.30 <= noseRatio <= 0.70
+      // Si gira la cabeza a derecha o izquierda para apartar la vista:
+      if (noseRatio < 0.30 || noseRatio > 0.70) {
+        return { attentive: false, reason: 'looking_away_yaw' };
+      }
+    }
+
+    // 3. Orejas (si ambas están disponibles en landmarks 4 y 5):
+    if (lm.length >= 6 && lm[4] && lm[5]) {
+      const rEar = lm[4];
+      const lEar = lm[5];
+      const earSpan = Math.abs(lEar.x - rEar.x);
+      if (earSpan > 0.08) {
+        const earRatio = (nose.x - Math.min(rEar.x, lEar.x)) / earSpan;
+        if (earRatio < 0.32 || earRatio > 0.68) {
+          return { attentive: false, reason: 'looking_away_ear_yaw' };
+        }
+      }
+    }
+
+    // 4. Inclinación vertical (mirando al suelo / teclado o hacia el techo):
+    const eyeCenterY = (rEye.y + lEye.y) / 2;
+    const eyeToNoseY = nose.y - eyeCenterY;
+    const noseToMouthY = mouth.y - nose.y;
+
+    if (eyeToNoseY < 0.012 || noseToMouthY < 0.010) {
+      return { attentive: false, reason: 'looking_away_pitch' };
+    }
+
+    return { attentive: true, reason: 'attentive' };
+  }
+
   function initMediaPipeFace() {
     if (typeof FaceDetection !== 'undefined' && !mpFace) {
       try {
@@ -1016,10 +1073,22 @@ QByteArray DeckServer::getIndexHtml() const
         });
         mpFace.onResults((results) => {
           if (results && results.detections && results.detections.length > 0) {
-            lastFaceSeenTimestamp = Date.now();
-            isFaceCurrentlyVisible = true;
+            facePresenceConfidence = Math.min(5, facePresenceConfidence + 1);
+            const det = results.detections[0];
+            lastFaceBox = det.boundingBox || (det.locationData && det.locationData.relativeBoundingBox) || null;
+            const att = checkFaceAttention(det);
+            if (att.attentive) {
+              currentAttentionState = 'present';
+              lastAttentiveTimestamp = Date.now();
+            } else {
+              currentAttentionState = 'looking_away';
+            }
           } else {
-            isFaceCurrentlyVisible = false;
+            facePresenceConfidence = Math.max(0, facePresenceConfidence - 1);
+            if (facePresenceConfidence === 0) {
+              lastFaceBox = null;
+              currentAttentionState = 'absent';
+            }
           }
         });
         isMediaPipeFaceReady = true;
@@ -1222,13 +1291,14 @@ QByteArray DeckServer::getIndexHtml() const
       document.getElementById('radarDetails').style.display = 'flex';
       document.getElementById('radarTitle').textContent = 'Sensor Espacial: Activo';
       document.getElementById('radarSub').textContent = 'Monitorizando presencia y gestos en el aire';
-      lastFaceSeenTimestamp = Date.now();
-      isFaceCurrentlyVisible = true;
+      lastAttentiveTimestamp = Date.now();
+      currentAttentionState = 'present';
+      facePresenceConfidence = 3;
       absentSent = false;
       dimmedSent = false;
       lockedSent = false;
       presenceState = 'present';
-      updateRadarPresenceUI('present', 'Atento / Presente');
+      updateRadarPresenceUI('present', 'Atento / Mirando a pantalla');
 
       initMediaPipe();
       initMediaPipeFace();
@@ -1321,20 +1391,22 @@ QByteArray DeckServer::getIndexHtml() const
     }).catch(e => console.error(e));
   }
 
-  function checkGeometricFacePresence(data, w, h) {
+  function checkOpticalPresenceFallback(data, w, h, avgLuma) {
+    if (avgLuma < 22) {
+      // Muy poca iluminación: no generar fluctuaciones falsas por ruido del sensor
+      return;
+    }
     let skinPixels = 0;
     let minX = w, maxX = 0, minY = h, maxY = 0;
-    for (let y = Math.floor(h * 0.1); y < Math.floor(h * 0.75); y += 2) {
-      for (let x = Math.floor(w * 0.2); x < Math.floor(w * 0.8); x += 2) {
+    for (let y = Math.floor(h * 0.15); y < Math.floor(h * 0.70); y += 2) {
+      for (let x = Math.floor(w * 0.25); x < Math.floor(w * 0.75); x += 2) {
         const idx = (y * w + x) * 4;
-        const r = data[idx];
-        const g = data[idx + 1];
-        const b = data[idx + 2];
+        const r = data[idx], g = data[idx + 1], b = data[idx + 2];
         const luma = 0.299 * r + 0.587 * g + 0.114 * b;
         const cb = 128 - 0.168736 * r - 0.331264 * g + 0.500 * b;
         const cr = 128 + 0.500 * r - 0.418688 * g - 0.081312 * b;
 
-        if (luma > 40 && luma < 235 && cb >= 77 && cb <= 127 && cr >= 133 && cr <= 173) {
+        if (luma > 45 && luma < 230 && cb >= 77 && cb <= 127 && cr >= 133 && cr <= 173) {
           skinPixels++;
           if (x < minX) minX = x;
           if (x > maxX) maxX = x;
@@ -1345,7 +1417,19 @@ QByteArray DeckServer::getIndexHtml() const
     }
     const boxW = maxX - minX;
     const boxH = maxY - minY;
-    return (skinPixels >= 250 && boxW >= 24 && boxH >= 28 && (boxH / boxW) >= 0.7 && (boxH / boxW) <= 2.2);
+    const isBlobFace = (skinPixels >= 320 && boxW >= 26 && boxH >= 30 && (boxH / boxW) >= 0.8 && (boxH / boxW) <= 2.1);
+    if (isBlobFace) {
+      facePresenceConfidence = Math.min(5, facePresenceConfidence + 1);
+      if (facePresenceConfidence >= 3) {
+        currentAttentionState = 'present';
+        lastAttentiveTimestamp = Date.now();
+      }
+    } else {
+      facePresenceConfidence = Math.max(0, facePresenceConfidence - 1);
+      if (facePresenceConfidence === 0) {
+        currentAttentionState = 'absent';
+      }
+    }
   }
 
   let lastFrameTime = 0;
@@ -1382,77 +1466,95 @@ QByteArray DeckServer::getIndexHtml() const
     const prevCtx = previewCanvas.getContext('2d');
     prevCtx.drawImage(workerCanvas, 0, 0, previewCanvas.width, previewCanvas.height);
 
-    // 1. Detección Óptica de Presencia / Rostro cada ~200ms
-    if (now - lastFaceCheckTime >= 200) {
+    // Calcular luma media para control de iluminación
+    let sumLuma = 0;
+    for (let i = 0; i < data.length; i += 16) {
+      sumLuma += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    }
+    const avgLuma = sumLuma / (data.length / 16);
+
+    // 1. Detección Óptica de Presencia & Orientación Facial (cada ~150ms)
+    if (now - lastFaceCheckTime >= 150) {
       lastFaceCheckTime = now;
-      if (faceDetector) {
-        try {
-          const faces = await faceDetector.detect(video);
-          if (faces && faces.length > 0) {
-            lastFaceSeenTimestamp = now;
-            isFaceCurrentlyVisible = true;
-          } else {
-            isFaceCurrentlyVisible = false;
-          }
-        } catch (e) {
-          if (isMediaPipeFaceReady && mpFace) {
-            try { await mpFace.send({ image: video }); } catch(err) {}
-          } else {
-            isFaceCurrentlyVisible = checkGeometricFacePresence(data, w, h);
-            if (isFaceCurrentlyVisible) lastFaceSeenTimestamp = now;
-          }
-        }
-      } else if (isMediaPipeFaceReady && mpFace) {
+      if (isMediaPipeFaceReady && mpFace) {
         try {
           await mpFace.send({ image: video });
         } catch (err) {
-          isFaceCurrentlyVisible = checkGeometricFacePresence(data, w, h);
-          if (isFaceCurrentlyVisible) lastFaceSeenTimestamp = now;
+          console.warn('mpFace frame error:', err);
+        }
+      } else if (faceDetector) {
+        try {
+          const faces = await faceDetector.detect(video);
+          if (faces && faces.length > 0) {
+            facePresenceConfidence = Math.min(5, facePresenceConfidence + 1);
+            currentAttentionState = 'present';
+            lastAttentiveTimestamp = now;
+          } else {
+            facePresenceConfidence = Math.max(0, facePresenceConfidence - 1);
+            if (facePresenceConfidence === 0) currentAttentionState = 'absent';
+          }
+        } catch (e) {
+          checkOpticalPresenceFallback(data, w, h, avgLuma);
         }
       } else {
-        isFaceCurrentlyVisible = checkGeometricFacePresence(data, w, h);
-        if (isFaceCurrentlyVisible) lastFaceSeenTimestamp = now;
+        checkOpticalPresenceFallback(data, w, h, avgLuma);
       }
     }
 
-    // Evaluación de Presencia y Cuenta Atrás Dinámica
-    const elapsedSinceFace = now - lastFaceSeenTimestamp;
+    // Dibujar caja de atención en la vista previa del teléfono
+    if (lastFaceBox) {
+      prevCtx.strokeStyle = (currentAttentionState === 'present') ? '#4ade80' : '#facc15';
+      prevCtx.lineWidth = 2;
+      const bw = previewCanvas.width;
+      const bh = previewCanvas.height;
+      const rx = (lastFaceBox.xMin !== undefined ? lastFaceBox.xMin : (lastFaceBox.x || 0)) * bw;
+      const ry = (lastFaceBox.yMin !== undefined ? lastFaceBox.yMin : (lastFaceBox.y || 0)) * bh;
+      const rw = (lastFaceBox.width || 0.3) * bw;
+      const rh = (lastFaceBox.height || 0.4) * bh;
+      prevCtx.strokeRect(rx, ry, Math.max(16, rw), Math.max(16, rh));
+    }
 
-    if (elapsedSinceFace < 1500) {
+    // Evaluación de Presencia & Atención (Apartar la vista o Ausente)
+    const elapsedSinceAttentive = now - lastAttentiveTimestamp;
+
+    if (currentAttentionState === 'present' && elapsedSinceAttentive < 1500) {
       if (presenceState !== 'present') {
         presenceState = 'present';
         absentSent = false;
         dimmedSent = false;
         lockedSent = false;
         sendSpatialEvent('presence', 'present', 0);
-        updateRadarPresenceUI('present', 'Atento / Presente');
+        updateRadarPresenceUI('present', 'Atento / Mirando a pantalla');
       }
     } else {
-      const absentSec = Math.floor(elapsedSinceFace / 1000);
+      const absentSec = Math.floor(elapsedSinceAttentive / 1000);
+      const isLookingAway = (currentAttentionState === 'looking_away');
+      const stateLabel = isLookingAway ? 'Mirando fuera' : 'Ausente';
+      const stateEvt = isLookingAway ? 'looking_away' : 'absent';
 
       if (absentSec >= 60) {
         if (!lockedSent) {
           presenceState = 'locked';
           lockedSent = true;
-          sendSpatialEvent('presence', 'absent', elapsedSinceFace);
+          sendSpatialEvent('presence', stateEvt, elapsedSinceAttentive);
         }
-        updateRadarPresenceUI('locked', 'Sesión Bloqueada (>60s)');
+        updateRadarPresenceUI('locked', 'Sesión Bloqueada (>60s ' + stateLabel + ')');
       } else if (absentSec >= 15) {
         if (!dimmedSent) {
           presenceState = 'dimmed';
           dimmedSent = true;
-          sendSpatialEvent('presence', 'dimmed', elapsedSinceFace);
+          sendSpatialEvent('presence', 'dimmed', elapsedSinceAttentive);
         }
         const remainLock = 60 - absentSec;
-        updateRadarPresenceUI('dimmed', 'Ausente (' + absentSec + 's) - Atenuado | Bloqueo en ' + remainLock + 's');
+        updateRadarPresenceUI('dimmed', stateLabel + ' (' + absentSec + 's) - Pantalla Atenuada | Bloqueo en ' + remainLock + 's');
       } else {
         if (!absentSent) {
           presenceState = 'away';
           absentSent = true;
-          sendSpatialEvent('presence', 'away', elapsedSinceFace);
+          sendSpatialEvent('presence', stateEvt, elapsedSinceAttentive);
         }
         const remainDim = 15 - absentSec;
-        updateRadarPresenceUI('away', 'Ausente (' + absentSec + 's) - Atenuando en ' + remainDim + 's...');
+        updateRadarPresenceUI('away', stateLabel + ' (' + absentSec + 's) - Atenuando en ' + remainDim + 's...');
       }
     }
 
