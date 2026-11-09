@@ -33,7 +33,8 @@ KdeConnectRunner::KdeConnectRunner(QObject *parent, const KPluginMetaData &metaD
                        KRunner::Action(QStringLiteral("flick"), QStringLiteral("arrow-right-double"), i18n("Lanzar archivo al móvil (Spatial Flick)")),
                        KRunner::Action(QStringLiteral("sms"), QStringLiteral("message-new"), i18n("Abrir Mensajes SMS")),
                        KRunner::Action(QStringLiteral("clipboard"), QStringLiteral("klipper"), i18n("Enviar Portapapeles")),
-                       KRunner::Action(QStringLiteral("mic"), QStringLiteral("audio-input-microphone"), i18n("Iniciar Micrófono de Continuidad"))};
+                       KRunner::Action(QStringLiteral("mic"), QStringLiteral("audio-input-microphone"), i18n("Iniciar Micrófono de Continuidad")),
+                       KRunner::Action(QStringLiteral("dualkey"), QStringLiteral("security-high"), i18n("Solicitar Autorización Dual-Key"))};
 
     m_contactActions = {KRunner::Action(QStringLiteral("sms_contact"), QStringLiteral("message-new"), i18n("Enviar SMS")),
                         KRunner::Action(QStringLiteral("call_contact"), QStringLiteral("call-start"), i18n("Llamar / Marcar teléfono")),
@@ -144,6 +145,54 @@ void KdeConnectRunner::match(KRunner::RunnerContext &context)
         // 3. Búsqueda cruzada de archivos en el teléfono (si no es prefijo exclusivo de contactos)
         if (!isContactPrefix && !searchTerm.isEmpty() && (isExplicitPrefix || searchTerm.length() >= 3)) {
             searchRemoteFiles(context, deviceId, devName, searchTerm);
+        }
+
+        // 4. Integración Dual-Key Authorization
+        QDBusInterface authIface(QStringLiteral("org.kde.kdeconnect"),
+                                 QStringLiteral("/modules/kdeconnect/devices/%1/biometricauth").arg(deviceId),
+                                 QStringLiteral("org.kde.kdeconnect.device.biometricauth"),
+                                 QDBusConnection::sessionBus());
+        if (authIface.isValid()) {
+            const bool isPending = authIface.property("isPending").toBool();
+            if (isPending) {
+                const QString cmd = authIface.property("currentCommand").toString();
+                const QString srv = authIface.property("currentService").toString();
+                const QString risk = authIface.property("currentRiskLevel").toString();
+
+                KRunner::QueryMatch authMatch(this);
+                authMatch.setId(QStringLiteral("kdeconnect:dualkey:pending:") + deviceId);
+                authMatch.setData(deviceId);
+                authMatch.setText(i18n("🔑 Dual-Key: Autorización Requerida [%1]", risk.toUpper()));
+                authMatch.setSubtext(!cmd.isEmpty() ? i18n("Comando: %1 (%2) · Pulsa Enter para aprobar en %3", cmd, srv, devName)
+                                                    : i18n("Solicitud de %1 · Pulsa Enter para aprobar en %2", srv, devName));
+                authMatch.setIconName(QStringLiteral("security-high"));
+                authMatch.setCategoryRelevance(KRunner::QueryMatch::CategoryRelevance::Highest);
+                authMatch.setRelevance(1.0);
+
+                QList<KRunner::Action> authActions = {
+                    KRunner::Action(QStringLiteral("dualkey_approve"), QStringLiteral("dialog-ok"), i18n("Aprobar Autorización")),
+                    KRunner::Action(QStringLiteral("dualkey_reject"), QStringLiteral("dialog-cancel"), i18n("Rechazar Autorización"))};
+                authMatch.setActions(authActions);
+                context.addMatch(authMatch);
+            } else {
+                const bool isDualKeyQuery = term.startsWith(QStringLiteral("dualkey"), Qt::CaseInsensitive)
+                    || term.startsWith(QStringLiteral("dual-key"), Qt::CaseInsensitive) || term.startsWith(QStringLiteral("2fa"), Qt::CaseInsensitive)
+                    || term.startsWith(QStringLiteral("auth"), Qt::CaseInsensitive) || term.startsWith(QStringLiteral("autorizar"), Qt::CaseInsensitive)
+                    || term.startsWith(QStringLiteral("biometric"), Qt::CaseInsensitive) || term.startsWith(QStringLiteral("huella"), Qt::CaseInsensitive);
+
+                if (isDualKeyQuery) {
+                    KRunner::QueryMatch authMatch(this);
+                    authMatch.setId(QStringLiteral("kdeconnect:dualkey:request:") + deviceId);
+                    authMatch.setData(deviceId);
+                    authMatch.setText(i18n("🔑 Dual-Key: Solicitar Autorización Biométrica"));
+                    authMatch.setSubtext(i18n("Lanzar verificación de seguridad en %1", devName));
+                    authMatch.setIconName(QStringLiteral("security-high"));
+                    authMatch.setCategoryRelevance(KRunner::QueryMatch::CategoryRelevance::High);
+                    authMatch.setRelevance(0.92);
+
+                    context.addMatch(authMatch);
+                }
+            }
         }
     }
 }
@@ -330,6 +379,31 @@ void KdeConnectRunner::run(const KRunner::RunnerContext &context, const KRunner:
 {
     Q_UNUSED(context)
 
+    // 0. Si es una acción o solicitud Dual-Key
+    const QString matchId = match.id();
+    if (matchId.startsWith(QLatin1String("kdeconnect:dualkey:"))) {
+        const QString actionId = match.selectedAction().id();
+        const QString targetDevId = matchId.section(QLatin1Char(':'), -1);
+
+        QDBusInterface authIface(QStringLiteral("org.kde.kdeconnect"),
+                                 QStringLiteral("/modules/kdeconnect/devices/%1/biometricauth").arg(targetDevId),
+                                 QStringLiteral("org.kde.kdeconnect.device.biometricauth"),
+                                 QDBusConnection::sessionBus());
+
+        if (actionId == QLatin1String("dualkey_reject")) {
+            authIface.call(QDBus::NoBlock, QStringLiteral("respondBiometric"), false);
+        } else if (matchId.startsWith(QLatin1String("kdeconnect:dualkey:pending:"))) {
+            authIface.call(QDBus::NoBlock, QStringLiteral("respondBiometric"), true);
+        } else {
+            authIface.call(QDBus::NoBlock,
+                           QStringLiteral("requestAuthorization"),
+                           QStringLiteral("KRunner"),
+                           QStringLiteral("Verificación manual de identidad"),
+                           QStringLiteral("medium"));
+        }
+        return;
+    }
+
     // 1. Si es un archivo del móvil emparejado, abrirlo con la aplicación predeterminada de Plasma
     if (match.data().typeId() == QMetaType::QString && match.data().toString().startsWith(QLatin1Char('/'))) {
         const QString filePath = match.data().toString();
@@ -382,6 +456,16 @@ void KdeConnectRunner::run(const KRunner::RunnerContext &context, const KRunner:
         deviceIface.pluginCall(QStringLiteral("clipboard"), QStringLiteral("sendClipboard"));
     } else if (actionId == QLatin1String("mic")) {
         deviceIface.pluginCall(QStringLiteral("continuitymic"), QStringLiteral("start"));
+    } else if (actionId == QLatin1String("dualkey")) {
+        QDBusInterface authIface(QStringLiteral("org.kde.kdeconnect"),
+                                 QStringLiteral("/modules/kdeconnect/devices/%1/biometricauth").arg(deviceId),
+                                 QStringLiteral("org.kde.kdeconnect.device.biometricauth"),
+                                 QDBusConnection::sessionBus());
+        authIface.call(QDBus::NoBlock,
+                       QStringLiteral("requestAuthorization"),
+                       QStringLiteral("KRunner"),
+                       QStringLiteral("Verificación manual de identidad"),
+                       QStringLiteral("medium"));
     } else {
         // Acción por defecto: abrir la aplicación de KDE Connect
         QProcess::startDetached(QStringLiteral("kdeconnect-app"), {QStringLiteral("--device"), deviceId});

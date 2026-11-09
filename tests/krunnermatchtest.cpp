@@ -96,6 +96,32 @@ private Q_SLOTS:
         QList<KRunner::Action> contactActions = {smsAction, callAction, copyAction};
         QCOMPARE(contactActions.count(), 3);
     }
+
+    void testDualKeyMatchConstruction()
+    {
+        KRunner::QueryMatch pendingMatch;
+        pendingMatch.setData(QStringLiteral("kdeconnect:dualkey:pending:f151e55ead63488c839b638f43e6d1ce"));
+        pendingMatch.setText(QStringLiteral("🔑 Dual-Key: Autorización Requerida [CRITICAL]"));
+        pendingMatch.setSubtext(QStringLiteral("Comando: sudo dd if=arch.iso of=/dev/sdb · Pulsa Enter para aprobar"));
+        pendingMatch.setIconName(QStringLiteral("security-high"));
+        pendingMatch.setRelevance(1.0);
+
+        QCOMPARE(pendingMatch.data().toString(), QStringLiteral("kdeconnect:dualkey:pending:f151e55ead63488c839b638f43e6d1ce"));
+        QCOMPARE(pendingMatch.text(), QStringLiteral("🔑 Dual-Key: Autorización Requerida [CRITICAL]"));
+        QCOMPARE(pendingMatch.iconName(), QStringLiteral("security-high"));
+        QCOMPARE(pendingMatch.relevance(), 1.0);
+
+        KRunner::Action approveAction(QStringLiteral("dualkey_approve"), QStringLiteral("dialog-ok"), QStringLiteral("Aprobar Autorización"));
+        KRunner::Action rejectAction(QStringLiteral("dualkey_reject"), QStringLiteral("dialog-cancel"), QStringLiteral("Rechazar Autorización"));
+        QList<KRunner::Action> authActions = {approveAction, rejectAction};
+        QCOMPARE(authActions.count(), 2);
+        QCOMPARE(authActions.at(0).id(), QStringLiteral("dualkey_approve"));
+        QCOMPARE(authActions.at(1).id(), QStringLiteral("dualkey_reject"));
+
+        KRunner::Action dualkeyDeviceAction(QStringLiteral("dualkey"), QStringLiteral("security-high"), QStringLiteral("Solicitar Autorización Dual-Key"));
+        QCOMPARE(dualkeyDeviceAction.id(), QStringLiteral("dualkey"));
+        QCOMPARE(dualkeyDeviceAction.iconSource(), QStringLiteral("security-high"));
+    }
 };
 
 QTEST_MAIN(KRunnerMatchTest)
