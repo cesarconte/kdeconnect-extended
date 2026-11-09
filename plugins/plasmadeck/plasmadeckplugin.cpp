@@ -48,6 +48,7 @@ PlasmaDeckPlugin::PlasmaDeckPlugin(QObject *parent, const QVariantList &args)
     connect(&m_server, &DeckServer::actionTriggered, this, &PlasmaDeckPlugin::handleAction);
     connect(&m_server, &DeckServer::spatialEventReceived, this, &PlasmaDeckPlugin::handleSpatialEvent);
     connect(&m_server, &DeckServer::flickReceived, this, &PlasmaDeckPlugin::handleFlickReceived);
+    connect(&m_server, &DeckServer::dualKeyResponseReceived, this, &PlasmaDeckPlugin::handleDualKeyResponse);
 
     connect(&m_telemetryTimer, &QTimer::timeout, this, &PlasmaDeckPlugin::updateTelemetry);
     connect(&m_windowPollTimer, &QTimer::timeout, this, &PlasmaDeckPlugin::checkActiveWindow);
@@ -76,6 +77,20 @@ void PlasmaDeckPlugin::connected()
     setupKWinWindowTracker();
     if (device()) {
         m_server.setAllowedAddresses(device()->reachableAddresses());
+
+        QDBusConnection::sessionBus().connect(QStringLiteral("org.kde.kdeconnect"),
+                                              QStringLiteral("/modules/kdeconnect/devices/%1/biometricauth").arg(device()->id()),
+                                              QStringLiteral("org.kde.kdeconnect.device.biometricauth"),
+                                              QStringLiteral("authRequested"),
+                                              this,
+                                              SLOT(onAuthRequested(QString, QString, QString, QString)));
+
+        QDBusConnection::sessionBus().connect(QStringLiteral("org.kde.kdeconnect"),
+                                              QStringLiteral("/modules/kdeconnect/devices/%1/biometricauth").arg(device()->id()),
+                                              QStringLiteral("org.kde.kdeconnect.device.biometricauth"),
+                                              QStringLiteral("authenticationFinished"),
+                                              this,
+                                              SLOT(onAuthFinished(bool)));
     }
 }
 
@@ -307,6 +322,21 @@ void PlasmaDeckPlugin::handleAction(const QString &actionId, const QString &cmd,
                                 QStringLiteral("org.kde.kglobalaccel.Component"),
                                 QDBusConnection::sessionBus());
             kwin.call(QDBus::NoBlock, QStringLiteral("invokeShortcut"), QStringLiteral("Show Desktop"));
+        }
+    } else if (actionId == QLatin1String("dualkey")) {
+        QDBusInterface iface(QStringLiteral("org.kde.kdeconnect"),
+                             QStringLiteral("/modules/kdeconnect/devices/%1/biometricauth").arg(device()->id()),
+                             QStringLiteral("org.kde.kdeconnect.device.biometricauth"),
+                             QDBusConnection::sessionBus());
+        const bool pending = iface.property("isPending").toBool();
+        if (pending) {
+            const QString cmd = iface.property("currentCommand").toString();
+            const QString srv = iface.property("currentService").toString();
+            const QString risk = iface.property("currentRiskLevel").toString();
+            const QString tid = iface.property("currentTransactionId").toString();
+            m_server.broadcastDualKeyRequest(tid, srv, cmd, risk, 25);
+        } else {
+            iface.call(QStringLiteral("requestAuthorization"), QStringLiteral("Plasma Deck"), QStringLiteral("Verificación biométrica"), QStringLiteral("low"));
         }
     } else if (actionId == QLatin1String("screenshot")) {
         QProcess::startDetached(QStringLiteral("spectacle"), {QStringLiteral("-r")});
@@ -698,6 +728,27 @@ void PlasmaDeckPlugin::handleFlickReceived(const QString &fileName, const QStrin
             QProcess::startDetached(QStringLiteral("dolphin"), {QStringLiteral("--select"), savedPath});
         }
     }
+}
+
+void PlasmaDeckPlugin::handleDualKeyResponse(const QString &transactionId, bool approved)
+{
+    Q_UNUSED(transactionId)
+    QDBusMessage msg = QDBusMessage::createMethodCall(QStringLiteral("org.kde.kdeconnect"),
+                                                      QStringLiteral("/modules/kdeconnect/devices/%1/biometricauth").arg(device()->id()),
+                                                      QStringLiteral("org.kde.kdeconnect.device.biometricauth"),
+                                                      QStringLiteral("respondBiometric"));
+    msg << approved;
+    QDBusConnection::sessionBus().call(msg, QDBus::NoBlock);
+}
+
+void PlasmaDeckPlugin::onAuthRequested(const QString &transactionId, const QString &service, const QString &command, const QString &riskLevel)
+{
+    m_server.broadcastDualKeyRequest(transactionId, service, command, riskLevel, 25);
+}
+
+void PlasmaDeckPlugin::onAuthFinished(bool success)
+{
+    m_server.broadcastDualKeyResolved(QString(), success);
 }
 
 #include "moc_plasmadeckplugin.cpp"

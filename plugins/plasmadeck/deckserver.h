@@ -36,11 +36,14 @@ public:
 
     void broadcastTelemetry(int cpuPercent, int ramPercent, int tempC);
     void broadcastContext(const QString &appName, const QString &windowTitle, const QJsonArray &buttons);
+    void broadcastDualKeyRequest(const QString &transactionId, const QString &service, const QString &command, const QString &riskLevel, int timeoutSec = 25);
+    void broadcastDualKeyResolved(const QString &transactionId, bool approved);
 
 Q_SIGNALS:
     void actionTriggered(const QString &actionId, const QString &command, const QString &shortcut);
     void spatialEventReceived(const QString &type, const QString &stateOrGesture, int durationMs);
     void flickReceived(const QString &fileName, const QString &fileDataB64, const QString &textContent, const QString &action);
+    void dualKeyResponseReceived(const QString &transactionId, bool approved);
 
 private Q_SLOTS:
     void onNewConnection();
@@ -68,4 +71,5 @@ private:
     QString m_lastAppName;
     QString m_lastWindowTitle;
     QJsonArray m_lastButtons;
+    QJsonObject m_pendingDualKey;
 };

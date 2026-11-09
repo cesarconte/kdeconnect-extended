@@ -49,6 +49,9 @@ private Q_SLOTS:
     void handleAction(const QString &actionId, const QString &cmd, const QString &shortcut);
     void handleSpatialEvent(const QString &type, const QString &value, int durationMs);
     void handleFlickReceived(const QString &fileName, const QString &fileDataB64, const QString &textContent, const QString &action);
+    void handleDualKeyResponse(const QString &transactionId, bool approved);
+    void onAuthRequested(const QString &transactionId, const QString &service, const QString &command, const QString &riskLevel);
+    void onAuthFinished(bool success);
 
 private:
     void readCpuStats(unsigned long long &workTime, unsigned long long &totalTime);

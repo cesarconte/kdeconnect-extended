@@ -331,6 +331,12 @@ void DeckServer::handleHttpRequest(QTcpSocket *socket, const QByteArray &data)
         initCtx[QStringLiteral("buttons")] = m_lastButtons;
         QByteArray ctxMsg = "data: " + QJsonDocument(initCtx).toJson(QJsonDocument::Compact) + "\n\n";
         socket->write(ctxMsg);
+
+        if (!m_pendingDualKey.isEmpty()) {
+            QByteArray dkeyMsg = "data: " + QJsonDocument(m_pendingDualKey).toJson(QJsonDocument::Compact) + "\n\n";
+            socket->write(dkeyMsg);
+        }
+
         socket->flush();
         return;
     }
@@ -343,6 +349,21 @@ void DeckServer::handleHttpRequest(QTcpSocket *socket, const QByteArray &data)
             const QString cmd = obj.value(QStringLiteral("command")).toString();
             const QString shortcut = obj.value(QStringLiteral("shortcut")).toString();
             Q_EMIT actionTriggered(id, cmd, shortcut);
+        }
+
+        QByteArray resp = "{\"status\":\"ok\"}";
+        sendResponse(socket, 200, QStringLiteral("application/json"), resp, originHeader);
+        return;
+    }
+
+    if (method == QLatin1String("POST") && (path == QLatin1String("/api/dualkey") || path.startsWith(QLatin1String("/api/dualkey?")))) {
+        QJsonDocument doc = QJsonDocument::fromJson(body);
+        if (doc.isObject()) {
+            QJsonObject obj = doc.object();
+            const QString transactionId = obj.value(QStringLiteral("transactionId")).toString();
+            const QString action = obj.value(QStringLiteral("action")).toString();
+            const bool approved = (action == QLatin1String("approve") || action == QLatin1String("accept"));
+            Q_EMIT dualKeyResponseReceived(transactionId, approved);
         }
 
         QByteArray resp = "{\"status\":\"ok\"}";
@@ -471,6 +492,59 @@ void DeckServer::broadcastContext(const QString &appName, const QString &windowT
     obj[QStringLiteral("app")] = appName;
     obj[QStringLiteral("title")] = windowTitle;
     obj[QStringLiteral("buttons")] = buttons;
+
+    QByteArray msg = "data: " + QJsonDocument(obj).toJson(QJsonDocument::Compact) + "\n\n";
+
+    for (int i = m_sseClients.size() - 1; i >= 0; --i) {
+        QTcpSocket *sock = m_sseClients[i];
+        if (sock && sock->state() == QAbstractSocket::ConnectedState) {
+            sock->write(msg);
+            sock->flush();
+        } else {
+            m_sseClients.removeAt(i);
+        }
+    }
+}
+
+void DeckServer::broadcastDualKeyRequest(const QString &transactionId, const QString &service, const QString &command, const QString &riskLevel, int timeoutSec)
+{
+    m_pendingDualKey = QJsonObject();
+    m_pendingDualKey[QStringLiteral("type")] = QStringLiteral("dualkey_request");
+    m_pendingDualKey[QStringLiteral("transactionId")] = transactionId;
+    m_pendingDualKey[QStringLiteral("service")] = service;
+    m_pendingDualKey[QStringLiteral("command")] = command;
+    m_pendingDualKey[QStringLiteral("riskLevel")] = riskLevel;
+    m_pendingDualKey[QStringLiteral("timeout")] = timeoutSec;
+
+    if (m_sseClients.isEmpty()) {
+        return;
+    }
+
+    QByteArray msg = "data: " + QJsonDocument(m_pendingDualKey).toJson(QJsonDocument::Compact) + "\n\n";
+
+    for (int i = m_sseClients.size() - 1; i >= 0; --i) {
+        QTcpSocket *sock = m_sseClients[i];
+        if (sock && sock->state() == QAbstractSocket::ConnectedState) {
+            sock->write(msg);
+            sock->flush();
+        } else {
+            m_sseClients.removeAt(i);
+        }
+    }
+}
+
+void DeckServer::broadcastDualKeyResolved(const QString &transactionId, bool approved)
+{
+    m_pendingDualKey = QJsonObject();
+
+    if (m_sseClients.isEmpty()) {
+        return;
+    }
+
+    QJsonObject obj;
+    obj[QStringLiteral("type")] = QStringLiteral("dualkey_resolved");
+    obj[QStringLiteral("transactionId")] = transactionId;
+    obj[QStringLiteral("approved")] = approved;
 
     QByteArray msg = "data: " + QJsonDocument(obj).toJson(QJsonDocument::Compact) + "\n\n";
 
@@ -871,6 +945,34 @@ QByteArray DeckServer::getIndexHtml() const
   </div>
 </div>
 
+<div class="modal-overlay" id="dualKeyModal" style="display:none;">
+  <div class="modal-content" id="dualKeyContent" style="border: 2px solid #ef4444; box-shadow: 0 10px 40px rgba(0,0,0,0.9), 0 0 30px rgba(239, 68, 68, 0.4);">
+    <div class="modal-header" style="justify-content: center; gap: 8px;">
+      <span style="font-size: 28px;">🔑</span>
+      <h3 style="margin: 0; color: #fff; font-size: 18px;">Dual-Key Authorization</h3>
+    </div>
+    <div id="dualKeyRiskBadge" style="display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 800; text-transform: uppercase; margin: 10px auto; background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #ef4444;">
+      CRÍTICO
+    </div>
+    <div style="background: rgba(0,0,0,0.5); border-radius: 12px; padding: 12px; margin: 10px 0; text-align: left; font-size: 13px;">
+      <div style="color: #94a3b8; font-size: 11px; margin-bottom: 2px;">COMANDO / OPERACIÓN:</div>
+      <div id="dualKeyCommand" style="color: #38bdf8; font-family: monospace; font-size: 12px; word-break: break-all; font-weight: bold;">sudo dd if=arch.iso of=/dev/sdb</div>
+      <div style="color: #94a3b8; font-size: 11px; margin-top: 8px; margin-bottom: 2px;">SERVICIO / CONTEXTO:</div>
+      <div id="dualKeyService" style="color: #cbd5e1; font-size: 12px;">dualkey-cli (sudo)</div>
+    </div>
+    
+    <div style="position: relative; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; margin-bottom: 12px;">
+      <div id="dualKeyProgressBar" style="height: 100%; width: 100%; background: #38bdf8; transition: width 1s linear;"></div>
+    </div>
+    <div id="dualKeyCountdown" style="font-size: 12px; color: #94a3b8; margin-bottom: 14px;">Tiempo restante: <b id="dualKeySeconds" style="color: #fff;">25</b>s</div>
+
+    <div style="display: flex; gap: 10px;">
+      <button id="btnDualKeyReject" onclick="respondDualKey(false)" style="flex: 1; padding: 12px; background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.5); color: #f87171; border-radius: 12px; font-weight: bold; font-size: 13px; cursor: pointer;">✕ Rechazar</button>
+      <button id="btnDualKeyApprove" onclick="respondDualKey(true)" style="flex: 1.3; padding: 12px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: 1px solid #10b981; color: #fff; border-radius: 12px; font-weight: bold; font-size: 13px; cursor: pointer; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);">✓ APROBAR</button>
+    </div>
+  </div>
+</div>
+
 <div class="deck-grid" id="deckGrid">
   <!-- Dynamic buttons inserted here -->
 </div>
@@ -924,13 +1026,13 @@ QByteArray DeckServer::getIndexHtml() const
     ],
     system: [
       { id: "panic_shield", icon: "🚨", title: "Panic Shield", sub: "Privacidad", cmd: "panic_shield" },
+      { id: "dualkey", icon: "🔑", title: "Dual-Key", sub: "2FA Biométrico", cmd: "dualkey" },
       { id: "screenshot", icon: "📸", title: "Captura", sub: "Spectacle", cmd: "screenshot" },
       { id: "lock", icon: "🔒", title: "Bloquear", sub: "loginctl", cmd: "lock" },
       { id: "play_pause", icon: "⏯️", title: "Play/Pausa", sub: "Media", cmd: "play_pause" },
       { id: "next_track", icon: "⏭️", title: "Siguiente", sub: "Media", cmd: "next_track" },
       { id: "mute_sound", icon: "🔇", title: "Mute", sub: "PipeWire", cmd: "mute_sound" },
-      { id: "grid_view", icon: "🔲", title: "Ventanas", sub: "Overview", cmd: "grid_view" },
-      { id: "terminal", icon: "⚡", title: "Konsole", sub: "Terminal", cmd: "terminal" }
+      { id: "grid_view", icon: "🔲", title: "Ventanas", sub: "Overview", cmd: "grid_view" }
     ]
   };
 
@@ -944,6 +1046,10 @@ QByteArray DeckServer::getIndexHtml() const
         btn.style.border = '1px solid rgba(239, 68, 68, 0.6)';
         btn.style.background = 'linear-gradient(145deg, #2d141e 0%, #1a0b12 100%)';
         btn.style.boxShadow = '0 0 14px rgba(239, 68, 68, 0.25)';
+      } else if (b.id === 'dualkey') {
+        btn.style.border = '1px solid rgba(245, 158, 11, 0.6)';
+        btn.style.background = 'linear-gradient(145deg, #2d2414 0%, #1a150b 100%)';
+        btn.style.boxShadow = '0 0 14px rgba(245, 158, 11, 0.25)';
       }
       btn.innerHTML = `
         <div class="key-icon">${b.icon || '⚡'}</div>
@@ -1007,6 +1113,101 @@ QByteArray DeckServer::getIndexHtml() const
     }
   }
 
+  // Dual-Key Authorization
+  let activeDualKeyTid = null;
+  let dualKeyTimer = null;
+  let dualKeyRemaining = 25;
+
+  function showDualKeyModal(data) {
+    activeDualKeyTid = data.transactionId;
+    dualKeyRemaining = data.timeout || 25;
+    const initialSeconds = dualKeyRemaining;
+
+    document.getElementById('dualKeyCommand').textContent = data.command || data.service || 'Operación sensible';
+    document.getElementById('dualKeyService').textContent = (data.service || 'Sistema') + ' (' + (data.user || 'usuario') + ')';
+
+    const riskBadge = document.getElementById('dualKeyRiskBadge');
+    const content = document.getElementById('dualKeyContent');
+    const risk = (data.riskLevel || 'medium').toLowerCase();
+
+    if (risk === 'critical') {
+      riskBadge.textContent = '🔴 CRÍTICO';
+      riskBadge.style.background = 'rgba(239, 68, 68, 0.2)';
+      riskBadge.style.borderColor = '#ef4444';
+      riskBadge.style.color = '#ef4444';
+      content.style.borderColor = '#ef4444';
+      content.style.boxShadow = '0 10px 40px rgba(0,0,0,0.9), 0 0 30px rgba(239, 68, 68, 0.5)';
+    } else if (risk === 'high') {
+      riskBadge.textContent = '🟠 ALTO';
+      riskBadge.style.background = 'rgba(245, 158, 11, 0.2)';
+      riskBadge.style.borderColor = '#f59e0b';
+      riskBadge.style.color = '#f59e0b';
+      content.style.borderColor = '#f59e0b';
+      content.style.boxShadow = '0 10px 40px rgba(0,0,0,0.9), 0 0 30px rgba(245, 158, 11, 0.4)';
+    } else {
+      riskBadge.textContent = '🟡 MEDIO';
+      riskBadge.style.background = 'rgba(56, 189, 248, 0.2)';
+      riskBadge.style.borderColor = '#38bdf8';
+      riskBadge.style.color = '#38bdf8';
+      content.style.borderColor = '#38bdf8';
+      content.style.boxShadow = '0 10px 40px rgba(0,0,0,0.9), 0 0 25px rgba(56, 189, 248, 0.3)';
+    }
+
+    const modal = document.getElementById('dualKeyModal');
+    modal.style.display = 'flex';
+
+    if (navigator.vibrate) {
+      navigator.vibrate([100, 50, 150]);
+    }
+
+    if (dualKeyTimer) clearInterval(dualKeyTimer);
+    const pBar = document.getElementById('dualKeyProgressBar');
+    const secEl = document.getElementById('dualKeySeconds');
+    secEl.textContent = dualKeyRemaining;
+    pBar.style.width = '100%';
+
+    dualKeyTimer = setInterval(() => {
+      dualKeyRemaining--;
+      if (dualKeyRemaining < 0) {
+        clearInterval(dualKeyTimer);
+        modal.style.display = 'none';
+        return;
+      }
+      secEl.textContent = dualKeyRemaining;
+      pBar.style.width = Math.max(0, (dualKeyRemaining / initialSeconds) * 100) + '%';
+    }, 1000);
+  }
+
+  function hideDualKeyModal() {
+    if (dualKeyTimer) clearInterval(dualKeyTimer);
+    activeDualKeyTid = null;
+    const modal = document.getElementById('dualKeyModal');
+    if (modal) modal.style.display = 'none';
+  }
+
+  function respondDualKey(approved) {
+    if (navigator.vibrate) {
+      navigator.vibrate(approved ? [50, 30, 50] : [100]);
+    }
+    const tid = activeDualKeyTid;
+    hideDualKeyModal();
+
+    fetch('/api/dualkey' + (deckToken ? ('?token=' + encodeURIComponent(deckToken)) : ''), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Deck-Token': deckToken
+      },
+      body: JSON.stringify({
+        transactionId: tid,
+        action: approved ? 'approve' : 'reject',
+        token: deckToken
+      })
+    }).then(() => {
+      showGestureToast(approved ? '✅' : '❌', approved ? 'Autorizado' : 'Rechazado');
+    }).catch(err => console.error(err));
+  }
+
   // Server-Sent Events (SSE)
   function connectSSE() {
     const sseUrl = deckToken ? ('/api/events?token=' + encodeURIComponent(deckToken)) : '/api/events';
@@ -1033,6 +1234,13 @@ QByteArray DeckServer::getIndexHtml() const
             sseButtons = [];
           }
           applyContext(data.app);
+        } else if (data.type === 'dualkey_request') {
+          showDualKeyModal(data);
+        } else if (data.type === 'dualkey_resolved') {
+          hideDualKeyModal();
+          if (data.approved) {
+            showGestureToast('✅', 'Autorización completada');
+          }
         }
       } catch (err) {
         console.error(err);
