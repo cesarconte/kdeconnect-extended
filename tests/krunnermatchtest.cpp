@@ -90,7 +90,7 @@ private Q_SLOTS:
         QCOMPARE(match.iconName(), QStringLiteral("user-identity"));
         QCOMPARE(match.relevance(), 0.90);
 
-        KRunner::Action smsAction(QStringLiteral("sms_contact"), QStringLiteral("view-conversation"), QStringLiteral("Enviar SMS"));
+        KRunner::Action smsAction(QStringLiteral("sms_contact"), QStringLiteral("message-new"), QStringLiteral("Enviar SMS"));
         KRunner::Action callAction(QStringLiteral("call_contact"), QStringLiteral("call-start"), QStringLiteral("Llamar / Marcar teléfono"));
         KRunner::Action copyAction(QStringLiteral("copy_contact"), QStringLiteral("edit-copy"), QStringLiteral("Copiar número"));
         QList<KRunner::Action> contactActions = {smsAction, callAction, copyAction};

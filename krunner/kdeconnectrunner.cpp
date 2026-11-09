@@ -31,11 +31,11 @@ KdeConnectRunner::KdeConnectRunner(QObject *parent, const KPluginMetaData &metaD
     m_deviceActions = {KRunner::Action(QStringLiteral("ring"), QStringLiteral("irc-voice"), i18n("Hacer sonar teléfono")),
                        KRunner::Action(QStringLiteral("browse"), QStringLiteral("document-open-folder"), i18n("Explorar archivos (SFTP)")),
                        KRunner::Action(QStringLiteral("flick"), QStringLiteral("arrow-right-double"), i18n("Lanzar archivo al móvil (Spatial Flick)")),
-                       KRunner::Action(QStringLiteral("sms"), QStringLiteral("view-conversation"), i18n("Abrir Mensajes SMS")),
+                       KRunner::Action(QStringLiteral("sms"), QStringLiteral("message-new"), i18n("Abrir Mensajes SMS")),
                        KRunner::Action(QStringLiteral("clipboard"), QStringLiteral("klipper"), i18n("Enviar Portapapeles")),
                        KRunner::Action(QStringLiteral("mic"), QStringLiteral("audio-input-microphone"), i18n("Iniciar Micrófono de Continuidad"))};
 
-    m_contactActions = {KRunner::Action(QStringLiteral("sms_contact"), QStringLiteral("view-conversation"), i18n("Enviar SMS")),
+    m_contactActions = {KRunner::Action(QStringLiteral("sms_contact"), QStringLiteral("message-new"), i18n("Enviar SMS")),
                         KRunner::Action(QStringLiteral("call_contact"), QStringLiteral("call-start"), i18n("Llamar / Marcar teléfono")),
                         KRunner::Action(QStringLiteral("copy_contact"), QStringLiteral("edit-copy"), i18n("Copiar número"))};
 }
