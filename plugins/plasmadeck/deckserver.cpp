@@ -95,8 +95,8 @@ bool DeckServer::isClientIpAllowed(const QHostAddress &addr) const
         return true;
     }
 
-    // Permitir siempre localhost
-    if (addr == QHostAddress::LocalHost || addr == QHostAddress::LocalHostIPv6 || addr == QHostAddress(QStringLiteral("127.0.0.1"))
+    // Permitir siempre localhost y loopback
+    if (addr.isLoopback() || addr == QHostAddress::LocalHost || addr == QHostAddress::LocalHostIPv6 || addr == QHostAddress(QStringLiteral("127.0.0.1"))
         || addr == QHostAddress(QStringLiteral("::1"))) {
         return true;
     }
@@ -297,7 +297,7 @@ void DeckServer::handleHttpRequest(QTcpSocket *socket, const QByteArray &data)
         return;
     }
 
-    if (method == QLatin1String("POST") && path == QLatin1String("/api/action")) {
+    if (method == QLatin1String("POST") && (path == QLatin1String("/api/action") || path.startsWith(QLatin1String("/api/action?")))) {
         QJsonDocument doc = QJsonDocument::fromJson(body);
         if (doc.isObject()) {
             QJsonObject obj = doc.object();

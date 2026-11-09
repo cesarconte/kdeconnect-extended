@@ -139,6 +139,28 @@ private Q_SLOTS:
             QTRY_COMPARE_WITH_TIMEOUT(spy.count(), 1, 2000);
         }
 
+        // 4. Petición de acción con token en query string (/api/action?token=...)
+        {
+            QSignalSpy spy(&server, &DeckServer::actionTriggered);
+            QTcpSocket client;
+            client.connectToHost(QStringLiteral("127.0.0.1"), 54332);
+            QVERIFY(client.waitForConnected(2000));
+            QTest::qWait(50);
+
+            QJsonObject actionObj;
+            actionObj[QStringLiteral("id")] = QStringLiteral("panic_shield");
+            QByteArray body = QJsonDocument(actionObj).toJson(QJsonDocument::Compact);
+
+            QByteArray req = "POST /api/action?token=secr3t_t0k3n HTTP/1.1\r\nContent-Length: " + QByteArray::number(body.size()) + "\r\n\r\n" + body;
+            client.write(req);
+            client.flush();
+            QTest::qWait(50);
+
+            QTRY_COMPARE_WITH_TIMEOUT(spy.count(), 1, 2000);
+            QList<QVariant> args = spy.takeFirst();
+            QCOMPARE(args.at(0).toString(), QStringLiteral("panic_shield"));
+        }
+
         server.stop();
     }
 };
