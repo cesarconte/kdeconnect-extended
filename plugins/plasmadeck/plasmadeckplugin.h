@@ -55,6 +55,8 @@ private:
     int readTempC();
     QString findBestHostIp() const;
     void registerRunCommand();
+    bool triggerDolphinAction(const QString &actionName);
+    void sendKeyShortcut(const QString &key, int specialKey = 0, bool ctrl = false, bool alt = false, bool shift = false, bool super = false);
 
     DeckServer m_server;
     QTimer m_telemetryTimer;

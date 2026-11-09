@@ -370,12 +370,18 @@ QByteArray DeckServer::getIndexHtml() const
   .key-sub { font-size: 10px; color: #8e8e9f; margin-top: 3px; font-family: ui-monospace, monospace; }
 
   .profile-bar {
-    background: rgba(20, 20, 30, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(20, 20, 30, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 14px;
     padding: 6px;
     display: flex;
     gap: 6px;
+    position: sticky;
+    bottom: 0;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    z-index: 100;
+    margin-top: auto;
   }
   .profile-btn {
     flex: 1;
@@ -431,7 +437,7 @@ QByteArray DeckServer::getIndexHtml() const
   <button class="profile-btn" id="btnCode" onclick="setProfile('code')">💻 Código</button>
   <button class="profile-btn" id="btnFiles" onclick="setProfile('files')">📁 Archivos</button>
   <button class="profile-btn" id="btnWeb" onclick="setProfile('web')">🌐 Web</button>
-  <button class="profile-btn" id="btnSys" onclick="setProfile('system')">⚙️ Sistema</button>
+  <button class="profile-btn" id="btnSystem" onclick="setProfile('system')">⚙️ Sistema</button>
 </div>
 
 <script>
@@ -512,7 +518,11 @@ QByteArray DeckServer::getIndexHtml() const
   function setProfile(prof) {
     activeProfile = prof;
     document.querySelectorAll('.profile-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById('btn' + prof.charAt(0).toUpperCase() + prof.slice(1)).classList.add('active');
+    const btnId = 'btn' + prof.charAt(0).toUpperCase() + prof.slice(1);
+    const elem = document.getElementById(btnId);
+    if (elem) {
+      elem.classList.add('active');
+    }
 
     if (prof === 'auto') {
       applyContext(currentContextApp);
