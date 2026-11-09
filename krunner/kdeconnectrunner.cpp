@@ -204,8 +204,8 @@ void KdeConnectRunner::searchContacts(KRunner::RunnerContext &context, const QSt
             const QString sub = phone.isEmpty() ? i18n("Contacto · %1", devName) : i18n("📱 %1 (Contacto · %2)", phone, devName);
             match.setSubtext(sub);
             match.setIconName(QStringLiteral("user-identity"));
-            match.setCategoryRelevance(KRunner::QueryMatch::CategoryRelevance::High);
-            match.setRelevance(nameMatches ? 0.90 : 0.78);
+            match.setCategoryRelevance(KRunner::QueryMatch::CategoryRelevance::Highest);
+            match.setRelevance(nameMatches ? 0.95 : 0.85);
             match.setActions(m_contactActions);
 
             context.addMatch(match);
@@ -229,66 +229,91 @@ void KdeConnectRunner::searchRemoteFiles(KRunner::RunnerContext &context, const 
         return;
     }
 
-    // Directorios prioritarios en el almacenamiento del dispositivo móvil
-    const QStringList searchDirs = {QStringLiteral(""),
-                                    QStringLiteral("DCIM"),
-                                    QStringLiteral("DCIM/Camera"),
-                                    QStringLiteral("Pictures"),
-                                    QStringLiteral("Pictures/Screenshots"),
-                                    QStringLiteral("Download"),
-                                    QStringLiteral("Documents"),
-                                    QStringLiteral("Music"),
-                                    QStringLiteral("Movies")};
+    // Identificar raíces de almacenamiento en el móvil (almacenamiento interno Android o tarjetas SD)
+    QStringList storageRoots;
+    const QString emulated = mountDir + QStringLiteral("/storage/emulated/0");
+    if (QDir(emulated).exists()) {
+        storageRoots << emulated;
+    }
+    const QDir storageDir(mountDir + QStringLiteral("/storage"));
+    if (storageDir.exists()) {
+        const QStringList entries = storageDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+        for (const QString &entry : entries) {
+            if (entry != QLatin1String("emulated") && entry != QLatin1String("self")) {
+                const QString sdPath = storageDir.absoluteFilePath(entry);
+                if (!storageRoots.contains(sdPath)) {
+                    storageRoots << sdPath;
+                }
+            }
+        }
+    }
+    if (storageRoots.isEmpty()) {
+        storageRoots << mountDir;
+    }
+
+    // Subdirectorios principales donde los usuarios guardan contenido
+    const QStringList subFolderCandidates = {QStringLiteral(""),
+                                             QStringLiteral("Download"),
+                                             QStringLiteral("DCIM"),
+                                             QStringLiteral("DCIM/Camera"),
+                                             QStringLiteral("Pictures"),
+                                             QStringLiteral("Pictures/Screenshots"),
+                                             QStringLiteral("Documents"),
+                                             QStringLiteral("Music"),
+                                             QStringLiteral("Movies"),
+                                             QStringLiteral("MIUI")};
 
     QMimeDatabase mimeDb;
     int visited = 0;
     int matchesFound = 0;
-    const int maxVisited = 300;
-    const int maxMatches = 12;
+    const int maxVisited = 350;
+    const int maxMatches = 15;
 
-    for (const QString &relSubDir : searchDirs) {
-        if (!context.isValid()) {
-            return;
-        }
-
-        const QString targetPath = relSubDir.isEmpty() ? mountDir : (mountDir + QLatin1Char('/') + relSubDir);
-        QDir subDir(targetPath);
-        if (!subDir.exists()) {
-            continue;
-        }
-
-        const QFileInfoList entries = subDir.entryInfoList(QDir::Files | QDir::Readable | QDir::NoDotAndDotDot, QDir::Time);
-        for (const QFileInfo &entry : entries) {
+    for (const QString &baseRoot : storageRoots) {
+        for (const QString &relSubDir : subFolderCandidates) {
             if (!context.isValid()) {
                 return;
             }
 
-            if (++visited > maxVisited) {
-                return;
-            }
-
-            const QString fileName = entry.fileName();
-            if (fileName.startsWith(QLatin1Char('.'))) {
+            const QString targetPath = relSubDir.isEmpty() ? baseRoot : (baseRoot + QLatin1Char('/') + relSubDir);
+            QDir subDir(targetPath);
+            if (!subDir.exists()) {
                 continue;
             }
 
-            if (fileName.contains(searchTerm, Qt::CaseInsensitive)) {
-                KRunner::QueryMatch match(this);
-                match.setId(QStringLiteral("kdeconnect:file:") + entry.absoluteFilePath());
-                match.setData(entry.absoluteFilePath());
-                match.setText(fileName);
-
-                const QString parentFolder = entry.dir().dirName();
-                match.setSubtext(i18n("En %1 · %2", devName, parentFolder.isEmpty() ? i18n("Almacenamiento") : parentFolder));
-
-                const QMimeType mime = mimeDb.mimeTypeForFile(entry.absoluteFilePath(), QMimeDatabase::MatchExtension);
-                match.setIconName(!mime.iconName().isEmpty() ? mime.iconName() : QStringLiteral("document-open"));
-                match.setCategoryRelevance(KRunner::QueryMatch::CategoryRelevance::High);
-                match.setRelevance(0.8);
-
-                context.addMatch(match);
-                if (++matchesFound >= maxMatches) {
+            const QFileInfoList entries = subDir.entryInfoList(QDir::Files | QDir::Readable | QDir::NoDotAndDotDot, QDir::Time);
+            for (const QFileInfo &entry : entries) {
+                if (!context.isValid()) {
                     return;
+                }
+
+                if (++visited > maxVisited) {
+                    return;
+                }
+
+                const QString fileName = entry.fileName();
+                if (fileName.startsWith(QLatin1Char('.'))) {
+                    continue;
+                }
+
+                if (fileName.contains(searchTerm, Qt::CaseInsensitive)) {
+                    KRunner::QueryMatch match(this);
+                    match.setId(QStringLiteral("kdeconnect:file:") + entry.absoluteFilePath());
+                    match.setData(entry.absoluteFilePath());
+                    match.setText(fileName);
+
+                    const QString parentFolder = entry.dir().dirName();
+                    match.setSubtext(i18n("En %1 · %2", devName, parentFolder.isEmpty() ? i18n("Almacenamiento") : parentFolder));
+
+                    const QMimeType mime = mimeDb.mimeTypeForFile(entry.absoluteFilePath(), QMimeDatabase::MatchExtension);
+                    match.setIconName(!mime.iconName().isEmpty() ? mime.iconName() : QStringLiteral("document-open"));
+                    match.setCategoryRelevance(KRunner::QueryMatch::CategoryRelevance::High);
+                    match.setRelevance(0.85);
+
+                    context.addMatch(match);
+                    if (++matchesFound >= maxMatches) {
+                        return;
+                    }
                 }
             }
         }
