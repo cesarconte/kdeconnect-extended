@@ -3,9 +3,9 @@
 
 pkgname=kdeconnect-extended
 _pkgname=kdeconnect
-pkgver=27.03.70.r5868.ga8a2c85fc
+pkgver=27.03.70.r5874.gc580f7b68
 pkgrel=1
-pkgdesc="Extended KDE Connect for KDE Plasma 6 on CachyOS with macOS Continuity features (Device Radar UI, Universal Clipboard TTL, PipeWire Continuity Mic & Camera, Handoff, Proximity Unlock)"
+pkgdesc="Extended KDE Connect for KDE Plasma 6 on CachyOS with macOS Continuity features (Device Radar UI, Universal Clipboard TTL & Sanitizer, On-the-Fly OCR, PipeWire Continuity Mic & Camera, Smart Ducking, Handoff, Proximity Unlock, Plasma Deck)"
 arch=('x86_64')
 url="https://github.com/cesarconte/kdeconnect-extended"
 license=('GPL-2.0-or-later')
@@ -63,6 +63,7 @@ optdepends=(
     'python-nautilus: Nautilus file manager integration'
     'qt6-tools: Extended runcommand actions'
     'sshfs: Remote filesystem SFTP browser'
+    'tesseract: On-the-Fly OCR text extraction from clipboard images'
     'wireplumber: PipeWire session and policy manager for audio/video graphs'
 )
 provides=('kdeconnect')

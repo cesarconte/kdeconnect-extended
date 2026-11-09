@@ -8,6 +8,7 @@
 
 #include <QClipboard>
 #include <QObject>
+#include <QUrl>
 #include <core/kdeconnectplugin.h>
 
 #include "clipboardlistener.h"
@@ -67,14 +68,23 @@ public:
 
     Q_SCRIPTABLE void sendClipboard();
     Q_SCRIPTABLE void sendClipboard(const QVariant &content);
+    Q_SCRIPTABLE QString sanitizeUrl(const QString &url);
+    Q_SCRIPTABLE QString sanitizeText(const QString &text);
+    Q_SCRIPTABLE void triggerOcr(const QString &imagePath);
     QString dbusPath() const override;
 
     void receivePacket(const NetworkPacket &np) override;
     void connected() override;
     bool isAutoShareDisabled();
 
+    // Tracking sanitization helpers
+    static QString sanitizeTracking(const QString &text, bool &wasSanitized, int &strippedCount);
+    static QUrl cleanSingleUrl(const QUrl &url, int &removedCount);
+
 Q_SIGNALS:
     Q_SCRIPTABLE void autoShareDisabledChanged(bool b);
+    Q_SCRIPTABLE void urlSanitized(const QString &cleanText, int trackersRemoved);
+    Q_SCRIPTABLE void ocrTextDetected(const QString &text);
 
 private Q_SLOTS:
     void clipboardChanged(const QVariant &content, ClipboardListener::ClipboardContentType contentType);
@@ -82,6 +92,12 @@ private Q_SLOTS:
     void configChanged();
 
 private:
+    void performOcrOnClipboardImage(const QString &imagePath);
+    void handleOcrResult(const QString &text, const QString &imagePath);
+
     bool autoShare;
     bool sharePasswords;
+    bool cleanUrls;
+    bool ocrEnabled;
+    bool autoCopyOcrText;
 };

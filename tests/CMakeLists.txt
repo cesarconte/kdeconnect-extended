@@ -25,6 +25,18 @@ ecm_add_test(smshelpertest.cpp LINK_LIBRARIES ${kdeconnect_libraries})
 ecm_add_test(lanratelimittest.cpp LINK_LIBRARIES ${kdeconnect_libraries})
 ecm_add_test(lanipv6test.cpp LINK_LIBRARIES ${kdeconnect_libraries})
 ecm_add_test(clipboardttltest.cpp LINK_LIBRARIES ${kdeconnect_libraries})
+ecm_add_test(clipboardcleantest.cpp 
+    LINK_LIBRARIES 
+        ${kdeconnect_libraries}
+        Qt::Gui
+)
+target_sources(clipboardcleantest PRIVATE 
+    ../plugins/clipboard/clipboardplugin.cpp 
+    ../plugins/clipboard/clipboardlistener.cpp
+    ${CMAKE_CURRENT_BINARY_DIR}/../plugins/clipboard/plugin_clipboard_debug.cpp
+)
+target_include_directories(clipboardcleantest PRIVATE ../plugins/clipboard ${CMAKE_CURRENT_BINARY_DIR}/../plugins/clipboard)
+
 ecm_add_test(handofftest.cpp LINK_LIBRARIES ${kdeconnect_libraries})
 ecm_add_test(biometricauthtest.cpp LINK_LIBRARIES ${kdeconnect_libraries})
 ecm_add_test(smartduckingtest.cpp LINK_LIBRARIES ${kdeconnect_libraries})
@@ -64,4 +76,4 @@ if(NOT APPLE AND NOT WIN32)
 endif()
 
 # Do not touch the clipboard of the running session (and avoid a KSystemClipboard deadlock on exit under Wayland)
-set_tests_properties(notificationstest pluginloadtest PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+set_tests_properties(notificationstest pluginloadtest clipboardcleantest PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

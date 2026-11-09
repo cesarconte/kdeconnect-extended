@@ -19,6 +19,9 @@ Kirigami.ScrollablePage {
     Component.onCompleted: {
         autoShare.checked = config.getBool("autoShare", config.getBool("sendUnknown", true))
         password.checked = config.getBool("sendPassword", true)
+        cleanUrls.checked = config.getBool("cleanUrls", true)
+        ocrEnabled.checked = config.getBool("ocrEnabled", true)
+        autoCopyOcrText.checked = config.getBool("autoCopyOcrText", false)
         maxClipboardFileSizeMB.value = config.getInt(max_clipboard_file_size, 50)
     }
 
@@ -41,6 +44,24 @@ Kirigami.ScrollablePage {
             id: password
             text: i18nd("kdeconnect-plugins", "Including passwords (as marked by password managers)")
             onClicked: config.set("sendPassword", checked)
+        }
+
+        QQC2.CheckBox {
+            id: cleanUrls
+            text: i18nd("kdeconnect-plugins", "Clean tracking parameters from copied URLs (Clean Clipboard)")
+            onClicked: config.set("cleanUrls", checked)
+        }
+
+        QQC2.CheckBox {
+            id: ocrEnabled
+            text: i18nd("kdeconnect-plugins", "Extract text from clipboard images automatically (On-the-Fly OCR)")
+            onClicked: config.set("ocrEnabled", checked)
+        }
+
+        QQC2.CheckBox {
+            id: autoCopyOcrText
+            text: i18nd("kdeconnect-plugins", "Automatically copy extracted OCR text to clipboard")
+            onClicked: config.set("autoCopyOcrText", checked)
         }
 
         RowLayout {          

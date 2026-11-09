@@ -3,6 +3,8 @@ kdeconnect_add_plugin(kdeconnect_clipboard SOURCES clipboardplugin.cpp clipboard
 target_link_libraries(kdeconnect_clipboard kdeconnectcore
     Qt::DBus
     KF6::GuiAddons
+    KF6::I18n
+    KF6::Notifications
     ${kdeconnect_clipboard_WL_LINK_LIBS}
 )
 
