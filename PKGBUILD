@@ -3,9 +3,9 @@
 
 pkgname=kdeconnect-extended
 _pkgname=kdeconnect
-pkgver=27.03.70.r5899.g1a7bc8585
+pkgver=27.03.70.r5904.g57a26e7ab
 pkgrel=1
-pkgdesc="Extended KDE Connect for KDE Plasma 6 on CachyOS with macOS Continuity features (Device Radar UI, Universal Clipboard TTL & Sanitizer, On-the-Fly OCR, PipeWire Continuity Mic & Camera, Smart Ducking, Handoff, Proximity Unlock, Plasma Deck, Panic Shield, Spatial & AI Presence)"
+pkgdesc="Extended KDE Connect for KDE Plasma 6 on CachyOS with macOS Continuity features (Device Radar UI, Universal Clipboard TTL & Sanitizer, On-the-Fly OCR, PipeWire Continuity Mic & Camera, Smart Ducking, Handoff, Proximity Unlock, Plasma Deck, Panic Shield, Spatial & AI Presence, Dual-Key 2FA)"
 arch=('x86_64')
 url="https://github.com/cesarconte/kdeconnect-extended"
 license=('GPL-2.0-or-later')
@@ -68,7 +68,7 @@ optdepends=(
 )
 provides=('kdeconnect')
 conflicts=('kdeconnect')
-source=("git+https://github.com/cesarconte/kdeconnect-extended.git#branch=master")
+source=("kdeconnect-extended::git+file://${startdir}#branch=master")
 sha256sums=('SKIP')
 
 pkgver() {
