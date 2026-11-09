@@ -57,6 +57,7 @@ if(NOT APPLE AND NOT WIN32)
     add_subdirectory(biometricauth)
     add_subdirectory(smartducking)
     add_subdirectory(plasmadeck)
+    add_subdirectory(panicshield)
 endif()
 
 # If we split notifications per plugin, in several notifyrc files, they won't

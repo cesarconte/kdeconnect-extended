@@ -623,12 +623,12 @@ QByteArray DeckServer::getIndexHtml() const
       { id: "mute_tab", icon: "🔇", title: "Silenciar", sub: "Tab audio", cmd: "mute_tab" }
     ],
     system: [
+      { id: "panic_shield", icon: "🚨", title: "Panic Shield", sub: "Privacidad", cmd: "panic_shield" },
       { id: "screenshot", icon: "📸", title: "Captura", sub: "Spectacle", cmd: "screenshot" },
       { id: "lock", icon: "🔒", title: "Bloquear", sub: "loginctl", cmd: "lock" },
       { id: "play_pause", icon: "⏯️", title: "Play/Pausa", sub: "Media", cmd: "play_pause" },
       { id: "next_track", icon: "⏭️", title: "Siguiente", sub: "Media", cmd: "next_track" },
       { id: "mute_sound", icon: "🔇", title: "Mute", sub: "PipeWire", cmd: "mute_sound" },
-      { id: "night_color", icon: "🌙", title: "Noche", sub: "KWin Color", cmd: "night_color" },
       { id: "grid_view", icon: "🔲", title: "Ventanas", sub: "Overview", cmd: "grid_view" },
       { id: "terminal", icon: "⚡", title: "Konsole", sub: "Terminal", cmd: "terminal" }
     ]
@@ -640,6 +640,11 @@ QByteArray DeckServer::getIndexHtml() const
     buttons.forEach(b => {
       const btn = document.createElement('div');
       btn.className = 'deck-key';
+      if (b.id === 'panic_shield') {
+        btn.style.border = '1px solid rgba(239, 68, 68, 0.6)';
+        btn.style.background = 'linear-gradient(145deg, #2d141e 0%, #1a0b12 100%)';
+        btn.style.boxShadow = '0 0 14px rgba(239, 68, 68, 0.25)';
+      }
       btn.innerHTML = `
         <div class="key-icon">${b.icon || '⚡'}</div>
         <div class="key-title">${b.title}</div>

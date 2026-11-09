@@ -47,6 +47,7 @@ ecm_add_test(plasmadecktest.cpp
 )
 target_sources(plasmadecktest PRIVATE ../plugins/plasmadeck/deckserver.cpp)
 target_include_directories(plasmadecktest PRIVATE ../plugins/plasmadeck)
+ecm_add_test(panicshieldtest.cpp LINK_LIBRARIES ${kdeconnect_libraries})
 find_package(KF6Runner ${KF_MIN_VERSION} REQUIRED)
 ecm_add_test(krunnermatchtest.cpp LINK_LIBRARIES ${kdeconnect_libraries} KF6::Runner)
 ecm_add_test(proximityunlocktest.cpp LINK_LIBRARIES ${kdeconnect_libraries})

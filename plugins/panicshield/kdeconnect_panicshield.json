@@ -1,0 +1,24 @@
+{
+    "$schema": "../kdeconnect.schema.json",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "yugurta@gmail.com",
+                "Name": "Cesar"
+            }
+        ],
+        "Description": "Ultra-fast emergency privacy shield: instantly cloaks windows, mutes audio, pauses media, and silences notifications from mobile",
+        "Description[es]": "Escudo de privacidad ultrarrápido: oculta ventanas, silencia audio, pausa reproducción y suprime notificaciones desde el móvil",
+        "EnabledByDefault": true,
+        "Icon": "security-high",
+        "License": "GPL",
+        "Name": "Panic Shield / Privacy Mode",
+        "Name[es]": "Panic Shield / Modo Privacidad"
+    },
+    "X-KdeConnect-OutgoingPacketType": [
+        "kdeconnect.panicshield"
+    ],
+    "X-KdeConnect-SupportedPacketType": [
+        "kdeconnect.panicshield"
+    ]
+}

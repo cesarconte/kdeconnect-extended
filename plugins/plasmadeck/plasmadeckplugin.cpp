@@ -291,7 +291,13 @@ void PlasmaDeckPlugin::handleAction(const QString &actionId, const QString &cmd,
     qDebug() << "PlasmaDeckPlugin: action triggered:" << actionId;
 
     // SYSTEM ACTIONS
-    if (actionId == QLatin1String("screenshot")) {
+    if (actionId == QLatin1String("panic_shield")) {
+        QDBusMessage msg = QDBusMessage::createMethodCall(QStringLiteral("org.kde.kdeconnect"),
+                                                          QStringLiteral("/modules/kdeconnect/devices/%1/panicshield").arg(device()->id()),
+                                                          QStringLiteral("org.kde.kdeconnect.device.panicshield"),
+                                                          QStringLiteral("togglePanicShield"));
+        QDBusConnection::sessionBus().send(msg);
+    } else if (actionId == QLatin1String("screenshot")) {
         QProcess::startDetached(QStringLiteral("spectacle"), {QStringLiteral("-r")});
     } else if (actionId == QLatin1String("lock")) {
         QProcess::startDetached(QStringLiteral("loginctl"), {QStringLiteral("lock-session")});
