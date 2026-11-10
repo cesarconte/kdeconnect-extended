@@ -1063,6 +1063,7 @@ QByteArray DeckServer::getIndexHtml() const
       { id: "panic_shield", icon: "🚨", title: "Panic Shield", sub: "Privacidad", cmd: "panic_shield" },
       { id: "dualkey", icon: "🔑", title: "Dual-Key", sub: "2FA Biométrico", cmd: "dualkey" },
       { id: "screenshot", icon: "📸", title: "Captura", sub: "Spectacle", cmd: "screenshot" },
+      { id: "ocr", icon: "📝", title: "Texto OCR", sub: "Copiar pantalla", cmd: "ocr" },
       { id: "lock", icon: "🔒", title: "Bloquear", sub: "loginctl", cmd: "lock" },
       { id: "play_pause", icon: "⏯️", title: "Play/Pausa", sub: "Media", cmd: "play_pause" },
       { id: "next_track", icon: "⏭️", title: "Siguiente", sub: "Media", cmd: "next_track" },
