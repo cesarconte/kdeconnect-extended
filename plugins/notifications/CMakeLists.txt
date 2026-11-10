@@ -1,4 +1,4 @@
-kdeconnect_add_plugin(kdeconnect_notifications SOURCES sendreplydialog.cpp notificationsplugin.cpp notification.cpp)
+kdeconnect_add_plugin(kdeconnect_notifications SOURCES sendreplydialog.cpp notificationsplugin.cpp notification.cpp twofactordetector.cpp)
 
 target_include_directories(kdeconnect_notifications PRIVATE ${CMAKE_BINARY_DIR})
 

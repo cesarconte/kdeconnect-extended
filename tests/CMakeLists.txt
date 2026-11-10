@@ -63,6 +63,14 @@ ecm_add_test(spatialflicktest.cpp
 )
 target_sources(spatialflicktest PRIVATE ../plugins/plasmadeck/deckserver.cpp)
 target_include_directories(spatialflicktest PRIVATE ../plugins/plasmadeck ../plugins/spatialflick)
+
+ecm_add_test(twofactordetectortest.cpp
+    LINK_LIBRARIES
+        ${kdeconnect_libraries}
+        Qt6::Gui
+)
+target_sources(twofactordetectortest PRIVATE ../plugins/notifications/twofactordetector.cpp)
+target_include_directories(twofactordetectortest PRIVATE ../plugins/notifications)
 find_package(KF6Runner ${KF_MIN_VERSION} REQUIRED)
 ecm_add_test(krunnermatchtest.cpp LINK_LIBRARIES ${kdeconnect_libraries} KF6::Runner)
 ecm_add_test(proximityunlocktest.cpp LINK_LIBRARIES ${kdeconnect_libraries})

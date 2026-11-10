@@ -6,6 +6,7 @@
 
 #include "notification.h"
 #include "plugin_notifications_debug.h"
+#include "twofactordetector.h"
 
 #include <KLocalizedString>
 #include <KNotification>
@@ -139,6 +140,21 @@ void Notification::createKNotification(const NetworkPacket &np)
 
         connect(action, &KNotificationAction::activated, this, [this, actionId] {
             Q_EMIT actionTriggered(m_internalId, actionId);
+        });
+    }
+
+    // 2FA / OTP Verification Code Auto-Detection & Copy
+    const TwoFactorResult otpRes = TwoFactorDetector::detect(m_text, m_title, m_appName);
+    if (otpRes.detected) {
+        TwoFactorDetector::copyToClipboardSecurely(otpRes.code, 90);
+
+        const QString serviceName = otpRes.service.isEmpty() ? m_appName : otpRes.service;
+        m_notification->setTitle(i18n("🔑 Código 2FA: %1 (%2)", otpRes.code, serviceName));
+        m_notification->setText(i18n("Copiado al portapapeles (Ctrl+V).\n%1", text));
+
+        KNotificationAction *copyAgain = m_notification->addAction(i18n("📋 Copiar código: %1", otpRes.code));
+        connect(copyAgain, &KNotificationAction::activated, this, [otpRes] {
+            TwoFactorDetector::copyToClipboardSecurely(otpRes.code, 90);
         });
     }
 
