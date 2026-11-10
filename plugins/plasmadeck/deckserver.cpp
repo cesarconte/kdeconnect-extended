@@ -274,8 +274,13 @@ void DeckServer::handleHttpRequest(QTcpSocket *socket, const QByteArray &data)
         return;
     }
 
-    // 2. Validación de Token Criptográfico
-    if (!isRequestAuthorized(socket, path, reqHeaders, body)) {
+    const bool isPublicStaticAsset =
+        (path == QLatin1String("/manifest.json") || path.startsWith(QLatin1String("/manifest.json?")) || path == QLatin1String("/favicon.ico")
+         || path.startsWith(QLatin1String("/icons/")) || path == QLatin1String("/") || path == QLatin1String("/index.html")
+         || path.startsWith(QLatin1String("/?")) || path.startsWith(QLatin1String("/index.html?")));
+
+    // 2. Validación de Token Criptográfico (para APIs operativas)
+    if (!isPublicStaticAsset && !isRequestAuthorized(socket, path, reqHeaders, body)) {
         sendResponse(socket,
                      401,
                      QStringLiteral("text/html; charset=utf-8"),
@@ -290,6 +295,22 @@ void DeckServer::handleHttpRequest(QTcpSocket *socket, const QByteArray &data)
         && (path == QLatin1String("/") || path == QLatin1String("/index.html") || path.startsWith(QLatin1String("/?"))
             || path.startsWith(QLatin1String("/index.html?")))) {
         sendResponse(socket, 200, QStringLiteral("text/html; charset=utf-8"), (method == QLatin1String("HEAD")) ? QByteArray() : getIndexHtml(), originHeader);
+        return;
+    }
+
+    if ((method == QLatin1String("GET") || method == QLatin1String("HEAD"))
+        && (path == QLatin1String("/manifest.json") || path.startsWith(QLatin1String("/manifest.json?")))) {
+        sendResponse(socket,
+                     200,
+                     QStringLiteral("application/manifest+json; charset=utf-8"),
+                     (method == QLatin1String("HEAD")) ? QByteArray() : getManifestJson(),
+                     originHeader);
+        return;
+    }
+
+    if ((method == QLatin1String("GET") || method == QLatin1String("HEAD"))
+        && (path.startsWith(QLatin1String("/icons/")) || path == QLatin1String("/favicon.ico"))) {
+        sendResponse(socket, 200, QStringLiteral("image/svg+xml"), (method == QLatin1String("HEAD")) ? QByteArray() : getIconSvg(), originHeader);
         return;
     }
 
@@ -570,6 +591,9 @@ QByteArray DeckServer::getIndexHtml() const
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0a0a10">
 <title>Plasma Deck</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="icons/plasmadeck-192.svg">
+<link rel="apple-touch-icon" href="icons/plasmadeck-192.svg">
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/face_detection.js" crossorigin="anonymous"></script>
@@ -990,8 +1014,19 @@ QByteArray DeckServer::getIndexHtml() const
   let currentContextApp = 'system';
   let sseButtons = [];
 
-  const urlParams = new URLSearchParams(window.location.search);
-  const deckToken = urlParams.get('token') || '';
+  function resolveDeckToken() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlToken = urlParams.get('token');
+    if (urlToken) {
+      localStorage.setItem('plasmadeck_token', urlToken);
+      const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+      window.history.replaceState({ path: cleanUrl }, '', cleanUrl);
+      return urlToken;
+    }
+    return localStorage.getItem('plasmadeck_token') || '';
+  }
+
+  const deckToken = resolveDeckToken();
 
   const defaultProfiles = {
     code: [
@@ -2002,4 +2037,74 @@ QByteArray DeckServer::getIndexHtml() const
 </body>
 </html>
 )rawhtml";
+}
+
+QByteArray DeckServer::getManifestJson() const
+{
+    return R"rawjson({
+  "name": "Plasma Deck",
+  "short_name": "Plasma Deck",
+  "description": "KDE Plasma Control Deck & Spatial Remote",
+  "start_url": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0a10",
+  "theme_color": "#0a0a10",
+  "icons": [
+    {
+      "src": "icons/plasmadeck-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/plasmadeck-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+})rawjson";
+}
+
+QByteArray DeckServer::getIconSvg() const
+{
+    return R"rawsvg(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="pd-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a0a14"/>
+      <stop offset="50%" stop-color="#121224"/>
+      <stop offset="100%" stop-color="#06060c"/>
+    </linearGradient>
+    <linearGradient id="pd-neon" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#a855f7"/>
+    </linearGradient>
+    <filter id="pd-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#pd-bg)"/>
+  <rect x="24" y="24" width="464" height="464" rx="96" fill="none" stroke="url(#pd-neon)" stroke-width="4" stroke-opacity="0.4"/>
+  <g filter="url(#pd-glow)">
+    <rect x="96" y="96" width="136" height="136" rx="28" fill="#18182e" stroke="#38bdf8" stroke-width="3" stroke-opacity="0.8"/>
+    <rect x="280" y="96" width="136" height="136" rx="28" fill="#18182e" stroke="#a855f7" stroke-width="3" stroke-opacity="0.8"/>
+    <rect x="96" y="280" width="136" height="136" rx="28" fill="#18182e" stroke="#ec4899" stroke-width="3" stroke-opacity="0.8"/>
+    <rect x="280" y="280" width="136" height="136" rx="28" fill="#18182e" stroke="#06b6d4" stroke-width="3" stroke-opacity="0.8"/>
+    <circle cx="164" cy="164" r="28" fill="none" stroke="#38bdf8" stroke-width="6"/>
+    <circle cx="164" cy="164" r="10" fill="#38bdf8"/>
+    <line x1="324" y1="130" x2="324" y2="198" stroke="#a855f7" stroke-width="5" stroke-linecap="round"/>
+    <line x1="372" y1="130" x2="372" y2="198" stroke="#a855f7" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="324" cy="150" r="10" fill="#a855f7"/>
+    <circle cx="372" cy="178" r="10" fill="#a855f7"/>
+    <circle cx="156" cy="326" r="14" fill="none" stroke="#ec4899" stroke-width="5"/>
+    <path d="M 166 336 L 184 354 L 176 362 L 158 344 Z" fill="#ec4899"/>
+    <path d="M 324 330 L 344 348 L 324 366" fill="none" stroke="#06b6d4" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <line x1="352" y1="366" x2="376" y2="366" stroke="#06b6d4" stroke-width="6" stroke-linecap="round"/>
+  </g>
+</svg>)rawsvg";
 }

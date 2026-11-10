@@ -56,6 +56,8 @@ private:
     bool isRequestAuthorized(QTcpSocket *socket, const QString &path, const QString &reqHeaders, const QByteArray &body) const;
     bool isClientIpAllowed(const QHostAddress &addr) const;
     QByteArray getIndexHtml() const;
+    QByteArray getManifestJson() const;
+    QByteArray getIconSvg() const;
 
     QTcpServer m_server;
     quint16 m_port;
