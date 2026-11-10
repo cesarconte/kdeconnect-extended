@@ -173,7 +173,24 @@ void ClipboardPlugin::sendClipboard(const QVariant &content)
             int strippedCount = 0;
             contentStr = sanitizeTracking(contentStr, wasSanitized, strippedCount);
             if (wasSanitized && strippedCount > 0) {
-                qCDebug(KDECONNECT_PLUGIN_CLIPBOARD) << "Cleaned" << strippedCount << "trackers from outgoing clipboard link";
+                static QString s_lastCleanedUrl;
+                static qint64 s_lastCleanedTimestamp = 0;
+
+                if (contentStr != s_lastCleanedUrl || (now - s_lastCleanedTimestamp) > 1500) {
+                    s_lastCleanedUrl = contentStr;
+                    s_lastCleanedTimestamp = now;
+
+                    qCDebug(KDECONNECT_PLUGIN_CLIPBOARD) << "Cleaned" << strippedCount << "trackers from local clipboard link";
+                    ClipboardListener::instance()->setText(contentStr);
+
+                    Q_EMIT urlSanitized(contentStr, strippedCount);
+
+                    auto *notif = new KNotification(QStringLiteral("notification"), KNotification::CloseOnTimeout);
+                    notif->setComponentName(QStringLiteral("kdeconnect"));
+                    notif->setTitle(i18n("🔗 Enlace Limpiado"));
+                    notif->setText(i18n("Se han eliminado %1 parámetros de rastreo.", strippedCount));
+                    notif->sendEvent();
+                }
             }
         }
 
@@ -315,6 +332,44 @@ QString ClipboardPlugin::sanitizeText(const QString &text)
 void ClipboardPlugin::triggerOcr(const QString &imagePath)
 {
     performOcrOnClipboardImage(imagePath);
+}
+
+void ClipboardPlugin::stripFormatting()
+{
+    const QString plainText = ClipboardListener::instance()->currentContent().toString();
+    if (plainText.isEmpty()) {
+        return;
+    }
+
+    ClipboardListener::instance()->setText(plainText);
+
+    auto *notif = new KNotification(QStringLiteral("notification"), KNotification::CloseOnTimeout);
+    notif->setComponentName(QStringLiteral("kdeconnect"));
+    notif->setTitle(i18n("✨ Pegado Limpio"));
+    notif->setText(i18n("Formato enriquecido eliminado. Listo para pegar en texto plano."));
+    notif->sendEvent();
+}
+
+void ClipboardPlugin::cleanCurrentClipboard()
+{
+    const QString current = ClipboardListener::instance()->currentContent().toString();
+    if (current.isEmpty()) {
+        return;
+    }
+
+    bool wasSanitized = false;
+    int strippedCount = 0;
+    const QString clean = sanitizeTracking(current, wasSanitized, strippedCount);
+    if (wasSanitized && strippedCount > 0) {
+        ClipboardListener::instance()->setText(clean);
+        Q_EMIT urlSanitized(clean, strippedCount);
+
+        auto *notif = new KNotification(QStringLiteral("notification"), KNotification::CloseOnTimeout);
+        notif->setComponentName(QStringLiteral("kdeconnect"));
+        notif->setTitle(i18n("🔗 Enlace Limpiado"));
+        notif->setText(i18n("Se han eliminado %1 parámetros de rastreo.", strippedCount));
+        notif->sendEvent();
+    }
 }
 
 QUrl ClipboardPlugin::cleanSingleUrl(const QUrl &url, int &removedCount)

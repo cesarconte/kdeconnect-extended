@@ -71,6 +71,8 @@ public:
     Q_SCRIPTABLE QString sanitizeUrl(const QString &url);
     Q_SCRIPTABLE QString sanitizeText(const QString &text);
     Q_SCRIPTABLE void triggerOcr(const QString &imagePath);
+    Q_SCRIPTABLE void stripFormatting();
+    Q_SCRIPTABLE void cleanCurrentClipboard();
     QString dbusPath() const override;
 
     void receivePacket(const NetworkPacket &np) override;

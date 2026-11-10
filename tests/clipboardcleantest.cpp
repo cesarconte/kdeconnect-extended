@@ -143,6 +143,32 @@ private Q_SLOTS:
         QString ocrText = QString::fromUtf8(proc.readAllStandardOutput()).trimmed();
         QVERIFY(ocrText.contains(QStringLiteral("KDE Connect")));
     }
+
+    void testFacebookAndGoogleClickIds()
+    {
+        QUrl url(QStringLiteral("https://shop.example.com/item?gclid=ABC123xyz&fbclid=FB987654&wbraid=WB555&gbraid=GB666&item_id=77"));
+        int removed = 0;
+        QUrl clean = ClipboardPlugin::cleanSingleUrl(url, removed);
+
+        QCOMPARE(removed, 4);
+        QCOMPARE(clean.toString(), QStringLiteral("https://shop.example.com/item?item_id=77"));
+    }
+
+    void testAliExpressTrackers()
+    {
+        QUrl url(QStringLiteral("https://es.aliexpress.com/item/100500123.html?spm=a2g0o.productlist.main.1&scm=1007.40000.123"));
+        int removed = 0;
+        QUrl clean = ClipboardPlugin::cleanSingleUrl(url, removed);
+
+        QCOMPARE(removed, 2);
+        QCOMPARE(clean.toString(), QStringLiteral("https://es.aliexpress.com/item/100500123.html"));
+    }
+
+    void testStripFormatting()
+    {
+        ClipboardListener::instance()->setText(QStringLiteral("Texto en formato plano"));
+        QCOMPARE(ClipboardListener::instance()->currentContent().toString(), QStringLiteral("Texto en formato plano"));
+    }
 };
 
 QTEST_MAIN(ClipboardCleanTest)
