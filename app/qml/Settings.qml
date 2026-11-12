@@ -37,6 +37,10 @@ CachyScrollablePage {
     ColumnLayout {
         Layout.fillWidth: true
         Layout.minimumWidth: 0
+        Layout.leftMargin: CachyTheme.marginWindow
+        Layout.rightMargin: CachyTheme.marginWindow
+        Layout.topMargin: CachyTheme.marginWindow
+        Layout.bottomMargin: CachyTheme.marginWindow
         spacing: CachyTheme.spacingMedium
 
         CachyFormCard {
@@ -53,6 +57,7 @@ CachyScrollablePage {
         CachyFormHeader {
             title: i18nc("@title:group", "Backends")
             Layout.fillWidth: true
+            Layout.topMargin: CachyTheme.spacingSmall
         }
 
         CachyFormCard {

@@ -37,15 +37,23 @@ CachyScrollablePage {
         });
     }
 
-    header: CachySearchField {
-        id: searchField
-        onTextChanged: root.filterString = text;
-        focus: true
-        Keys.onDownPressed: event => {
-            pluginList.currentIndex = 0;
-            event.accepted = false; // Pass to KeyNavigation.down
+    header: Item {
+        implicitHeight: searchField.implicitHeight + 16
+
+        CachySearchField {
+            id: searchField
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.margins: 8
+            onTextChanged: root.filterString = text;
+            focus: true
+            Keys.onDownPressed: event => {
+                pluginList.currentIndex = 0;
+                event.accepted = false; // Pass to KeyNavigation.down
+            }
+            KeyNavigation.down: pluginList
         }
-        KeyNavigation.down: pluginList
     }
 
     ListView {
