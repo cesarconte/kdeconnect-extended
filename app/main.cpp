@@ -10,6 +10,7 @@
 #include <QIcon>
 #include <QProcess>
 #include <QQmlApplicationEngine>
+#include <QQmlContext>
 #include <QQuickStyle>
 #include <QQuickWindow>
 #include <QStandardPaths>
@@ -140,6 +141,7 @@ int main(int argc, char *argv[])
         qWarning() << "Failed to load the app" << engine.hasError();
         return 1;
     }
+
     auto obj = qobject_cast<QWindow *>(engine.rootObjects().constFirst());
 
     if (!screenshotPath.isEmpty()) {
