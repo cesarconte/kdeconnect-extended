@@ -1,7 +1,15 @@
 /*
  * SPDX-FileCopyrightText: 2015 Aleix Pol Gonzalez <aleixpol@kde.org>
- *
  * SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
+ *
+ * Window of the KDE Connect application, migrated to the CachyOS.UI design
+ * system (Golden Gate / Liquid Glass):
+ *
+ *  - the window is a `CachyWindow`: translucent frame with the KWin blur, a
+ *    44 px title bar with the hard 1 px divider and the 20 px squircle radius;
+ *  - the device list becomes the edge-to-edge sidebar of the window;
+ *  - the navigation model (`Kirigami.PageStack`) is preserved untouched, only
+ *    its chrome is replaced by the Golden Gate header.
  */
 
 import QtQuick
@@ -10,19 +18,34 @@ import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 import org.kde.kdeconnect
 import org.kde.config as KConfig
+import CachyOS.UI
 
-Kirigami.ApplicationWindow {
+CachyWindow {
     id: root
-    property int columnWidth: Kirigami.Units.gridUnit * 13
+    property int columnWidth: 240
 
     property string pendingDeviceId
     property string pendingPluginConfig
 
-    minimumWidth: Kirigami.Units.gridUnit * 15
-    minimumHeight: Kirigami.Units.gridUnit * 15
-    wideScreen: width > columnWidth * 5
-    pageStack.globalToolBar.canContainHandles: true
-    pageStack.globalToolBar.showNavigationButtons: applicationWindow().pageStack.currentIndex > 0 ? Kirigami.ApplicationHeaderStyle.ShowBackButton : 0
+    width: 960
+    height: 660
+    minimumWidth: 640
+    minimumHeight: 480
+    visible: true
+
+    showTrafficLights: true
+    showTitleBarDivider: true
+    showWindowFrame: true
+    resizable: true
+    cornerRadius: CachyTheme.radiusWindow
+    // The content keeps the canonical margin on the four sides: only the
+    // edge-to-edge sidebar reaches the divider of the header.
+    contentPadded: true
+    sidebarWidth: 300
+
+    title: pageStack.currentItem && pageStack.currentItem.title
+        ? pageStack.currentItem.title
+        : i18nd("kdeconnect-app", "KDE Connect")
 
     KConfig.WindowStateSaver {
         configGroupName: "MainWindow"
@@ -55,7 +78,8 @@ Kirigami.ApplicationWindow {
             return;
         }
         let devicePage = pageStack.push(deviceComp, {
-            currentDevice: device
+            currentDevice: device,
+            pageStack: pageStack
         });
 
         if (pluginConfig) {
@@ -73,87 +97,102 @@ Kirigami.ApplicationWindow {
         }
     }
 
-    globalDrawer: Kirigami.OverlayDrawer {
-        id: drawer
-        edge: Qt.application.layoutDirection === Qt.RightToLeft ? Qt.RightEdge : Qt.LeftEdge
-        modal: Kirigami.Settings.isMobile || (applicationWindow().width < Kirigami.Units.gridUnit * 50 && !collapsed) // Only modal when not collapsed, otherwise collapsed won't show.
-        width: Kirigami.Units.gridUnit * 16
-        onModalChanged: drawerOpen = !modal
+    // =========================================================================
+    // CABECERA — navegación entre páginas
+    // =========================================================================
+    headerLeading: [
+        RowLayout {
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 6
 
-        Behavior on width {
-            NumberAnimation {
-                duration: Kirigami.Units.longDuration
-                easing.type: Easing.InOutQuad
+            CachyToolbarButton {
+                iconName: "go-previous-symbolic"
+                visible: pageStack.depth > 1
+                tooltipText: i18nc("@action:button", "Back")
+                onClicked: pageStack.removePage(pageStack.currentIndex)
             }
         }
-        Kirigami.Theme.colorSet: Kirigami.Theme.Window
+    ]
 
-        handleClosedIcon.source: modal ? null : "sidebar-expand-left"
-        handleOpenIcon.source: modal ? null : "sidebar-collapse-left"
-        handleClosedToolTip: i18nc("@action:button", "Open device list")
-        handleOpenToolTip: i18nc("@action:button", "Close device list")
-        handle.Accessible.name: drawerOpen ? handleOpenToolTip : handleClosedToolTip
-        handleVisible: modal
+    // =========================================================================
+    // CABECERA — acciones de la página activa
+    // =========================================================================
+    headerActions: [
+        Row {
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 6
 
-        leftPadding: 0
-        rightPadding: 0
-        topPadding: 0
-        bottomPadding: 0
+            Repeater {
+                model: pageStack.currentItem && pageStack.currentItem.headerActions
+                    ? pageStack.currentItem.headerActions
+                    : []
 
-        contentItem: ColumnLayout {
-            spacing: 0
-            QQC2.ToolBar {
-                Layout.fillWidth: true
-                Layout.preferredHeight: pageStack.globalToolBar.preferredHeight
+                CachyToolbarButton {
+                    required property var modelData
 
-                contentItem: RowLayout {
-                    spacing: 0
+                    iconName: modelData.icon && modelData.icon.name ? modelData.icon.name : ""
+                    tooltipText: modelData.text ? modelData.text : ""
+                    visible: modelData.visible !== false
+                    primary: false
 
-                    Kirigami.Heading {
-                        text: i18nd("kdeconnect-app", "Devices")
-                        elide: Qt.ElideRight
-
-                        Layout.fillWidth: true
-                        Layout.leftMargin: Kirigami.Units.largeSpacing
-                    }
-
-                    QQC2.ToolButton {
-                        text: i18nc("@action:button", "Refresh")
-                        icon.name: 'view-refresh-symbolic'
-                        display: QQC2.AbstractButton.IconOnly
-                        Accessible.name: i18nc("@action:button accessible", "Refresh Devices")
-
-                        QQC2.ToolTip.text: text
-                        QQC2.ToolTip.delay: Kirigami.Units.toolTipDelay
-                        QQC2.ToolTip.visible: hovered
-
-                        Keys.onDownPressed: event => {
-                            devices.currentIndex = 0;
-                            event.accepted = false // Pass to KeyNavigation.down
-                        }
-                        KeyNavigation.down: devices
-
-                        onClicked: {
-                            //refresh
-                            DaemonDbusInterface.forceOnNetworkChange();
-                        }
-                    }
+                    onClicked: modelData.trigger()
                 }
             }
-            QQC2.ScrollView {
+        }
+    ]
+
+    // =========================================================================
+    // BARRA LATERAL — lista de dispositivos
+    // =========================================================================
+    sidebarHeaderActions: [
+        Row {
+            spacing: 6
+            anchors.verticalCenter: parent.verticalCenter
+
+            CachyToolbarButton {
+                iconName: "view-refresh-symbolic"
+                tooltipText: i18nc("@action:button", "Refresh")
+                onClicked: {
+                    //refresh
+                    DaemonDbusInterface.forceOnNetworkChange();
+                }
+            }
+        }
+    ]
+
+    sidebar: [
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.leftMargin: 12
+            anchors.rightMargin: 12
+            anchors.bottomMargin: 12
+            spacing: CachyTheme.spacingSmall
+
+            CachyHeading {
+                Layout.fillWidth: true
+                Layout.minimumWidth: 0
+                Layout.topMargin: 8
+                Layout.bottomMargin: 4
+                text: i18nd("kdeconnect-app", "Devices")
+                level: 3
+            }
+
+            Item {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                Layout.minimumWidth: 0
+                clip: true
+
                 ListView {
                     id: devices
-                    Layout.fillWidth: true
-                    clip: true
+                    anchors.fill: parent
                     activeFocusOnTab: true
                     keyNavigationEnabled: true
                     Accessible.role: Accessible.List
 
                     section {
                         property: "status"
-                        delegate: Kirigami.ListSectionHeader {
+                        delegate: CachySectionHeader {
                             width: ListView.view.width
                             text: switch (parseInt(section)) {
                             case DevicesModel.Paired:
@@ -165,29 +204,18 @@ Kirigami.ApplicationWindow {
                             }
                         }
                     }
-                    Kirigami.PlaceholderMessage {
-                        text: i18nd("kdeconnect-app", "No devices found")
-                        icon.name: 'edit-none-symbolic'
-                        anchors.centerIn: parent
-                        width: parent.width - (Kirigami.Units.largeSpacing * 4)
-                        visible: devices.count === 0 && !devicesModel.busy
-                    }
-
-                    QQC2.BusyIndicator {
-                        anchors.centerIn: parent
-                        visible: devicesModel.busy
-                    }
 
                     model: DevicesSortProxyModel {
                         sourceModel: devicesModel
                     }
+
                     delegate: QQC2.ItemDelegate {
                         id: delegate
                         icon.name: iconName
                         text: Kirigami.MnemonicData.richTextLabel
                         Accessible.name: Kirigami.MnemonicData.plainTextLabel ?? model.name // fallback needed for KF < 6.12
                         width: ListView.view.width
-                        highlighted: (pageStack.items[0] as DevicePage)?.currentDevice === device
+                        highlighted: (pageStack.currentItem as DevicePage)?.currentDevice === device
                         Accessible.role: Accessible.PageTab
                         Accessible.description: toolTip
 
@@ -200,84 +228,93 @@ Kirigami.ApplicationWindow {
                             onActivated: clicked()
                         }
 
-                        contentItem: Kirigami.IconTitleSubtitle {
+                        contentItem: CachyIconTitleSubtitle {
                             title: delegate.text
-                            subtitle: toolTip
+                            subtitle: delegate.toolTip ?? ""
                             selected: delegate.highlighted
-                            icon: icon.fromControlsIcon(delegate.icon)
+                            icon: delegate.icon
+                            onClicked: delegate.clicked()
                         }
+
+                        background: Item {}
+                        padding: 0
 
                         onClicked: {
                             pageStack.clear();
                             pageStack.push(deviceComp, {
-                                currentDevice: device
+                                currentDevice: device,
+                                pageStack: pageStack
                             });
                         }
                     }
                 }
+
+                CachyPlaceholderMessage {
+                    anchors.centerIn: parent
+                    width: parent.width - (CachyTheme.marginWindow * 2)
+                    visible: devices.count === 0 && !devicesModel.busy
+                    text: i18nd("kdeconnect-app", "No devices found")
+                    iconName: "edit-none-symbolic"
+                }
+
+                QQC2.BusyIndicator {
+                    anchors.centerIn: parent
+                    visible: devicesModel.busy
+                }
             }
 
-            Item {
-                Layout.fillHeight: true
+            // --- Pie: nombre anunciado y ajustes ---
+            RowLayout {
                 Layout.fillWidth: true
-            }
+                Layout.minimumWidth: 0
+                spacing: 6
 
-            QQC2.ToolBar {
-                Layout.fillWidth: true
-                Layout.preferredHeight: pageStack.globalToolBar.preferredHeight
-                position: QQC2.ToolBar.Footer
+                Text {
+                    Layout.fillWidth: true
+                    Layout.minimumWidth: 0
+                    text: announcedNameProperty.value
+                    elide: Text.ElideRight
+                    font.pixelSize: 11
+                    color: CachyTheme.textSecondary
 
-                contentItem: RowLayout {
-                    spacing: Kirigami.Units.smallSpacing
-                    QQC2.Label {
-                        text: announcedNameProperty.value
-                        elide: Qt.ElideRight
-
-                        Layout.fillWidth: true
-                        Layout.leftMargin: Kirigami.Units.largeSpacing
-
-                        DBusProperty {
-                            id: announcedNameProperty
-                            object: DaemonDbusInterface
-                            read: "announcedName"
-                            defaultValue: ""
-                        }
+                    DBusProperty {
+                        id: announcedNameProperty
+                        object: DaemonDbusInterface
+                        read: "announcedName"
+                        defaultValue: ""
                     }
+                }
 
-                    QQC2.ToolButton {
-                        text: i18nc("@action:button", "Settings")
-                        icon.name: "settings-configure"
-                        display: QQC2.AbstractButton.IconOnly
-
-                        QQC2.ToolTip.text: text
-                        QQC2.ToolTip.delay: Kirigami.Units.toolTipDelay
-                        QQC2.ToolTip.visible: hovered
-
-                        Keys.onUpPressed: event => {
-                            devices.currentIndex = devices.count-1;
-                            event.accepted = false; // Pass to KeyNavigation.up
-                        }
-                        KeyNavigation.up: devices
-
-                        onClicked: pageStack.pushDialogLayer(Qt.resolvedUrl("Settings.qml"), {}, {
-                            title: i18n("Settings")
-                        })
-                    }
+                CachyToolbarButton {
+                    iconName: "settings-configure-symbolic"
+                    tooltipText: i18nc("@action:button", "Settings")
+                    onClicked: pageStack.pushDialogLayer(Qt.resolvedUrl("Settings.qml"), {
+                        pageStack: pageStack
+                    }, {
+                        title: i18n("Settings")
+                    })
                 }
             }
         }
-    }
+    ]
 
-    contextDrawer: Kirigami.ContextDrawer {
-        id: contextDrawer
-    }
+    // =========================================================================
+    // CONTENIDO — pila de páginas (modelo de navegación intacto)
+    // =========================================================================
+    contentData: [
+        CachyPageStack {
+            id: pageStack
+            anchors.fill: parent
 
-    pageStack.initialPage: Qt.resolvedUrl("WelcomePage.qml")
-    pageStack.Keys.onEscapePressed: {
-        if (pageStack.currentIndex) {
-            pageStack.removePage(pageStack.currentIndex)
+            initialPage: Qt.resolvedUrl("WelcomePage.qml")
+
+            Keys.onEscapePressed: {
+                if (pageStack.currentIndex) {
+                    pageStack.removePage(pageStack.currentIndex)
+                }
+            }
         }
-    }
+    ]
 
     Component.onCompleted: devices.forceActiveFocus()
 }

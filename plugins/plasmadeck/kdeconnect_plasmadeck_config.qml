@@ -2,39 +2,48 @@
  * SPDX-FileCopyrightText: 2026 Cesar <yugurta@gmail.com>
  *
  * SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
+ *
+ * Plasma Deck plugin configuration page, migrated to the CachyOS.UI design
+ * system (Golden Gate / Liquid Glass).
  */
 
-import QtQuick 2.15
-import QtQuick.Controls 2.15 as QQC2
-import QtQuick.Layouts 1.15
-import org.kde.kirigami 2.20 as Kirigami
-import org.kde.kdeconnect 1.0
+import QtQuick
+import QtQuick.Layouts
+import org.kde.kdeconnect
+import CachyOS.UI
 
-Kirigami.ScrollablePage {
+CachyFormCardPage {
+    id: root
+
     property string device
 
-    Kirigami.FormLayout {
+    KdeConnectPluginConfig {
+        id: config
+        deviceId: root.device
+        pluginName: "kdeconnect_plasmadeck"
+    }
 
-        KdeConnectPluginConfig {
-            id: config
-            deviceId: device
-            pluginName: "kdeconnect_plasmadeck"
-        }
+    CachyFormCard {
+        Layout.fillWidth: true
 
-        QQC2.Label {
-            text: i18nd("kdeconnect-plugins", "Plasma Deck converts your mobile phone into an Elgato Stream Deck style touch companion and hardware telemetry display.")
+        Text {
+            text: i18nd("kdeconnect-plugins", "Plasma Deck converts your mobile phone into a touch companion and hardware telemetry display.")
             wrapMode: Text.WordWrap
+            font.pixelSize: 12
+            color: CachyTheme.textSecondary
             Layout.fillWidth: true
+            Layout.minimumWidth: 0
         }
 
-        QQC2.Button {
-            text: i18nd("kdeconnect-plugins", "🚀 Enviar y Abrir Plasma Deck en el móvil")
-            icon.name: "input-gaming"
+        CachyButton {
+            Layout.fillWidth: true
+            primary: true
+            text: i18nd("kdeconnect-plugins", "Enviar y Abrir Plasma Deck en el móvil")
+            iconName: "input-gaming"
             onClicked: {
                 var service = "org.kde.kdeconnect";
-                var path = "/modules/kdeconnect/devices/" + device + "/plasmadeck";
+                var path = "/modules/kdeconnect/devices/" + root.device + "/plasmadeck";
                 var iface = "org.kde.kdeconnect.device.plasmadeck";
-                // Trigger via D-Bus call
                 qdbus.call(service, path, iface, "openPlasmaDeckOnPhone");
             }
         }

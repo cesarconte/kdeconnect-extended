@@ -2,22 +2,25 @@
  * SPDX-FileCopyrightText: 2015 Aleix Pol Gonzalez <aleixpol@kde.org>
  *
  * SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
+ *
+ * Multimedia remote control page of the KDE Connect application, migrated to
+ * the CachyOS.UI design system (Golden Gate / Liquid Glass).
  */
 
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Controls as QQC2
 import QtQuick.Layouts
-import org.kde.kirigami as Kirigami
+import CachyOS.UI
 
-Kirigami.Page
-{
+Item {
     id: root
+
     property QtObject pluginInterface
     property QtObject device
     property bool muted: false
     property int volumeUnmuted
     property var volume: pluginInterface.volume
-    title: i18nd("kdeconnect-app", "Multimedia Controls")
+    property string title: i18nd("kdeconnect-app", "Multimedia Controls")
 
     onVolumeChanged: {
         if (muted && volume != 0) {
@@ -51,6 +54,9 @@ Kirigami.Page
 
     function msToTime(totalTimeMs)
     {
+        if (!totalTimeMs || totalTimeMs < 0) {
+            return "00:00";
+        }
         let hours = Math.floor(totalTimeMs/(1000*60*60));
         let minutes = Math.floor((totalTimeMs-(hours*1000*60*60))/(1000*60));
         let seconds = Math.floor((totalTimeMs-(minutes*1000*60)-(hours*1000*60*60))/1000);
@@ -61,16 +67,18 @@ Kirigami.Page
         }
     }
 
-    Kirigami.PlaceholderMessage {
+    CachyPlaceholderMessage {
         id: noPlayersText
         text: i18nd("kdeconnect-app", "No players available")
+        iconName: "multimedia-player-symbolic"
         anchors.centerIn: parent
+        width: parent.width - (CachyTheme.marginWindow * 2)
         visible: pluginInterface.playerList.length == 0
     }
 
-    ColumnLayout
-    {
+    ColumnLayout {
         anchors.fill: parent
+        spacing: CachyTheme.spacingMedium
         visible: !noPlayersText.visible
 
         Component.onCompleted: {
@@ -79,95 +87,130 @@ Kirigami.Page
 
         Item { Layout.fillHeight: true }
 
-        Item {
+        CachyCard {
             Layout.alignment: Qt.AlignHCenter | Qt.AlignTop
-            Layout.preferredHeight: 240
-            Layout.preferredWidth: 240
-            width: 240; height: 240
+            Layout.preferredHeight: 220
+            Layout.preferredWidth: 220
+
             Image {
                 id: albumArt
-                anchors.centerIn: parent
-                width: 220; height: 220
+                anchors.fill: parent
                 fillMode: Image.PreserveAspectFit
                 source: root.pluginInterface.localAlbumArtUrl
                 visible: !!root.pluginInterface.localAlbumArtUrl && root.pluginInterface.localAlbumArtUrl.length > 0
                 smooth: true
             }
+
+            Image {
+                anchors.centerIn: parent
+                width: 64
+                height: 64
+                source: CachyTheme.iconUrl("multimedia-player-symbolic")
+                fillMode: Image.PreserveAspectFit
+                visible: !albumArt.visible
+                opacity: 0.45
+            }
         }
 
-        ComboBox {
+        QQC2.ComboBox {
             Layout.fillWidth: true
+            Layout.minimumWidth: 0
             model: root.pluginInterface.playerList
             onCurrentTextChanged: root.pluginInterface.player = currentText
             focus: true
             KeyNavigation.down: mediaBackButton
             KeyNavigation.priority: KeyNavigation.BeforeItem
         }
-        Label {
+
+        CachyHeading {
             Layout.fillWidth: true
+            Layout.minimumWidth: 0
             text: root.pluginInterface.title
             wrapMode: Text.Wrap
+            horizontalAlignment: Text.AlignHCenter
+            level: 2
         }
-        Label {
+
+        Text {
             Layout.fillWidth: true
+            Layout.minimumWidth: 0
             text: root.pluginInterface.artist
             visible: !artistAlbum.visible && root.pluginInterface.artist.length > 0
             wrapMode: Text.Wrap
+            horizontalAlignment: Text.AlignHCenter
+            font.pixelSize: 12
+            color: CachyTheme.textSecondary
         }
-        Label {
+
+        Text {
             Layout.fillWidth: true
+            Layout.minimumWidth: 0
             text: root.pluginInterface.album
             visible: !artistAlbum.visible && root.pluginInterface.album.length > 0
             wrapMode: Text.Wrap
+            horizontalAlignment: Text.AlignHCenter
+            font.pixelSize: 12
+            color: CachyTheme.textSecondary
         }
-        Label {
+
+        Text {
             id: artistAlbum
             Layout.fillWidth: true
+            Layout.minimumWidth: 0
             text: i18nd("kdeconnect-app", "%1 - %2", root.pluginInterface.artist, root.pluginInterface.album)
             visible: root.pluginInterface.album.length > 0 && root.pluginInterface.artist.length > 0
             wrapMode: Text.Wrap
+            horizontalAlignment: Text.AlignHCenter
+            font.pixelSize: 12
+            color: CachyTheme.textSecondary
         }
+
         RowLayout {
             Layout.fillWidth: true
+            spacing: CachyTheme.spacingSmall
             // player controls are by convention always LtR
             LayoutMirroring.enabled: false
-            Button {
+
+            CachyButton {
                 id: mediaBackButton
                 Layout.fillWidth: true
-                icon.name: "media-skip-backward"
+                iconName: "media-skip-backward"
                 onClicked: root.pluginInterface.sendAction("Previous")
                 KeyNavigation.right: mediaPlayButton
                 KeyNavigation.down: positionIndicator
-                // can't use KeyNavigation as it still flips on reading direction even with LayoutMirroring disabled
                 Keys.onRightPressed: mediaPlayButton.forceActiveFocus(Qt.TabFocusReason)
             }
-            Button {
+            CachyButton {
                 id: mediaPlayButton
                 Layout.fillWidth: true
-                icon.name: root.pluginInterface.isPlaying ? "media-playback-pause" : "media-playback-start"
+                primary: true
+                iconName: root.pluginInterface.isPlaying ? "media-playback-pause" : "media-playback-start"
                 onClicked: root.pluginInterface.sendAction("PlayPause");
-                // can't use KeyNavigation as it still flips on reading direction even with LayoutMirroring disabled
                 Keys.onLeftPressed: mediaBackButton.forceActiveFocus(Qt.TabFocusReason)
                 Keys.onRightPressed: mediaForwardButton.forceActiveFocus(Qt.TabFocusReason)
                 KeyNavigation.down: positionIndicator
             }
-            Button {
+            CachyButton {
                 id: mediaForwardButton
                 Layout.fillWidth: true
-                icon.name: "media-skip-forward"
+                iconName: "media-skip-forward"
                 onClicked: root.pluginInterface.sendAction("Next")
                 KeyNavigation.down: positionIndicator
-                // can't use KeyNavigation as it still flips on reading direction even with LayoutMirroring disabled
                 Keys.onLeftPressed: mediaPlayButton.forceActiveFocus(Qt.TabFocusReason)
             }
         }
+
         RowLayout {
             Layout.fillWidth: true
+            spacing: CachyTheme.spacingSmall
             // media progress indicators are by convention always LtR
             LayoutMirroring.enabled: false
             LayoutMirroring.childrenInherit: true
-            Label {
-                text: msToTime(positionIndicator.item.value)
+
+            Text {
+                text: positionIndicator.item ? msToTime(positionIndicator.item.value) : "00:00"
+                font.pixelSize: 11
+                color: CachyTheme.textMuted
             }
 
             MprisSlider {
@@ -178,19 +221,24 @@ Kirigami.Page
                 KeyNavigation.down: muteButton
             }
 
-            Label {
+            Text {
                 text: msToTime(root.pluginInterface.length)
+                font.pixelSize: 11
+                color: CachyTheme.textMuted
             }
         }
+
         RowLayout {
             Layout.fillWidth: true
-            Button {
+            spacing: CachyTheme.spacingSmall
+
+            CachyButton {
                 id: muteButton
-                icon.name: muted ? "audio-volume-muted" : soundState(root.pluginInterface.volume)
+                iconName: muted ? "audio-volume-muted" : soundState(root.pluginInterface.volume)
                 onClicked: toggleMute()
                 KeyNavigation.right: volumeSlider
             }
-            Slider {
+            CachySlider {
                 id: volumeSlider
                 value: volumeUnmuted
                 to: 99
@@ -203,6 +251,7 @@ Kirigami.Page
                 KeyNavigation.up: positionIndicator
             }
         }
+
         Item { Layout.fillHeight: true }
     }
 

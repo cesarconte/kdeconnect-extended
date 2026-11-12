@@ -3,6 +3,9 @@
  * SPDX-FileCopyrightText: 2024 ivan tkachenko <me@ratijas.tk>
  *
  * SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
+ *
+ * Full representation of the KDE Connect plasmoid, migrated to the CachyOS.UI
+ * design system (Golden Gate / Liquid Glass).
  */
 
 pragma ComponentBehavior: Bound
@@ -14,9 +17,9 @@ import QtQuick.Layouts
 import org.kde.config as KConfig
 import org.kde.kdeconnect as KDEConnect
 import org.kde.kirigami as Kirigami
-import org.kde.plasma.components as PlasmaComponents3
 import org.kde.plasma.extras as PlasmaExtras
 import org.kde.plasma.plasmoid
+import CachyOS.UI
 
 PlasmaExtras.Representation {
     id: kdeconnect
@@ -27,13 +30,13 @@ PlasmaExtras.Representation {
 
     collapseMarginsHint: true
 
-    implicitWidth: Kirigami.Units.gridUnit * 22
-    implicitHeight: Kirigami.Units.gridUnit * 25
+    implicitWidth: 396
+    implicitHeight: 450
 
-    Layout.minimumWidth: Kirigami.Units.gridUnit * 19
-    Layout.minimumHeight: Kirigami.Units.gridUnit * 22
-    Layout.preferredWidth: Kirigami.Units.gridUnit * 22
-    Layout.preferredHeight: Kirigami.Units.gridUnit * 25
+    Layout.minimumWidth: 342
+    Layout.minimumHeight: 396
+    Layout.preferredWidth: 396
+    Layout.preferredHeight: 450
 
     Component.onCompleted: {
         if (kdeconnect.isRadarView && kdeconnect.plasmoidItem) {
@@ -51,47 +54,41 @@ PlasmaExtras.Representation {
     }
 
     header: RowLayout {
-        spacing: Kirigami.Units.smallSpacing
+        spacing: CachyTheme.spacingSmall
 
         Kirigami.Icon {
             source: kdeconnect.isRadarView ? "network-wireless" : "kdeconnect"
-            implicitWidth: Kirigami.Units.iconSizes.small
-            implicitHeight: Kirigami.Units.iconSizes.small
-            color: Kirigami.Theme.highlightColor
-            Layout.leftMargin: Kirigami.Units.smallSpacing
+            implicitWidth: 18
+            implicitHeight: 18
+            color: CachyTheme.accentColor
+            Layout.leftMargin: CachyTheme.spacingSmall
         }
 
-        PlasmaComponents3.Label {
+        CachyHeading {
             text: kdeconnect.isRadarView ? i18n("Radar de KDE Connect") : i18n("Dispositivos")
-            font.bold: true
+            level: 4
             Layout.fillWidth: true
+            Layout.minimumWidth: 0
         }
 
-        // Botón Pin: mantener ventana fijada para permitir arrastrar desde Dolphin sin auto-cierre
-        PlasmaComponents3.ToolButton {
+        CachyToolbarButton {
             id: pinBtn
-            icon.name: "window-pin"
-            text: i18n("Mantener abierto")
-            display: PlasmaComponents3.AbstractButton.IconOnly
+            iconName: "window-pin"
             checkable: true
             checked: kdeconnect.plasmoidItem ? kdeconnect.plasmoidItem.isPinned : true
-            PlasmaComponents3.ToolTip {
-                text: pinBtn.checked ? i18n("Fijada abierta (permite arrastrar archivos desde Dolphin sin que se cierre)") : i18n("Desanclada (cerrar al cambiar de ventana)")
-            }
-            onToggled: {
+            tooltipText: pinBtn.checked
+                ? i18n("Fijada abierta (permite arrastrar archivos desde Dolphin sin que se cierre)")
+                : i18n("Desanclada (cerrar al cambiar de ventana)")
+            onToggled: (next) => {
                 if (kdeconnect.plasmoidItem) {
-                    kdeconnect.plasmoidItem.isPinned = checked;
+                    kdeconnect.plasmoidItem.isPinned = next;
                 }
             }
         }
 
-        PlasmaComponents3.ToolButton {
-            icon.name: kdeconnect.isRadarView ? "view-list-details" : "network-wireless"
-            text: kdeconnect.isRadarView ? i18n("Ver lista") : i18n("Ver radar")
-            display: PlasmaComponents3.AbstractButton.IconOnly
-            PlasmaComponents3.ToolTip {
-                text: kdeconnect.isRadarView ? i18n("Cambiar a vista de lista") : i18n("Cambiar a vista de radar")
-            }
+        CachyToolbarButton {
+            iconName: kdeconnect.isRadarView ? "view-list-details" : "network-wireless"
+            tooltipText: kdeconnect.isRadarView ? i18n("Cambiar a vista de lista") : i18n("Cambiar a vista de radar")
             onClicked: {
                 kdeconnect.isRadarView = !kdeconnect.isRadarView;
                 if (kdeconnect.isRadarView && kdeconnect.plasmoidItem) {
@@ -100,14 +97,10 @@ PlasmaExtras.Representation {
             }
         }
 
-        PlasmaComponents3.ToolButton {
-            visible: kdeconnect.plasmoidItem && kdeconnect.plasmoidItem.isPinned
-            icon.name: "window-close"
-            text: i18n("Cerrar")
-            display: PlasmaComponents3.AbstractButton.IconOnly
-            PlasmaComponents3.ToolTip {
-                text: i18n("Cerrar ventana")
-            }
+        CachyToolbarButton {
+            visible: Boolean(kdeconnect.plasmoidItem && kdeconnect.plasmoidItem.isPinned)
+            iconName: "window-close"
+            tooltipText: i18n("Cerrar ventana")
             onClicked: {
                 if (kdeconnect.plasmoidItem) {
                     kdeconnect.plasmoidItem.expanded = false;
@@ -118,12 +111,12 @@ PlasmaExtras.Representation {
 
     ColumnLayout {
         anchors.fill: parent
-        spacing: Kirigami.Units.smallSpacing
+        spacing: CachyTheme.spacingSmall
 
         HandoffBanner {
             id: handoffBanner
             Layout.fillWidth: true
-            Layout.margins: Kirigami.Units.smallSpacing
+            Layout.margins: CachyTheme.spacingSmall
             devicesModel: pairedDevicesModel
         }
 
@@ -132,7 +125,7 @@ PlasmaExtras.Representation {
             Layout.fillWidth: true
             Layout.fillHeight: true
             implicitWidth: kdeconnect.isRadarView ? deviceRadar.implicitWidth : devicesView.implicitWidth
-            implicitHeight: kdeconnect.isRadarView ? deviceRadar.implicitHeight : Kirigami.Units.gridUnit * 20
+            implicitHeight: kdeconnect.isRadarView ? deviceRadar.implicitHeight : 360
 
             DeviceRadar {
                 id: deviceRadar
@@ -141,70 +134,63 @@ PlasmaExtras.Representation {
                 devicesModel: pairedDevicesModel
             }
 
-            PlasmaComponents3.ScrollView {
+            QQC2.ScrollView {
                 anchors.fill: parent
                 visible: !kdeconnect.isRadarView
                 contentWidth: availableWidth
-
-                // Prevent horizontal scrollbar from appearing when vertical scrollbar shows/hides
                 QQC2.ScrollBar.horizontal.policy: QQC2.ScrollBar.AlwaysOff
 
                 contentItem: ListView {
                     id: devicesView
-
                     clip: true
-                    Layout.margins: 0
+                    spacing: CachyTheme.spacingSmall
 
                     delegate: DeviceDelegate {
                         width: ListView.view.width - ListView.view.leftMargin - ListView.view.rightMargin
                     }
+                }
+            }
 
-                    PlasmaExtras.PlaceholderMessage {
-                        width: parent.width
-                        anchors.centerIn: parent
-                        visible: devicesView.count === 0
+            CachyPlaceholderMessage {
+                width: parent.width - (CachyTheme.marginWindow * 2)
+                anchors.centerIn: parent
+                visible: !kdeconnect.isRadarView && devicesView.count === 0
 
-                        iconName: {
-                            if (pairedDevicesModel.count >= 0) {
-                                return pairedDevicesModel.count === 0 ? "edit-none" : "network-disconnect";
-                            }
-                            return "kdeconnect";
-                        }
-
-                        text: {
-                            if (pairedDevicesModel.count >= 0) {
-                                return pairedDevicesModel.count === 0 ? i18n("No paired devices") : i18np("Paired device is unavailable", "All paired devices are unavailable", pairedDevicesModel.count)
-                            } else if (allDevicesModel.count === 0) {
-                                return i18n("Install KDE Connect on your Android device to integrate it with Plasma!")
-                            }
-                        }
-                        helpfulAction: QQC2.Action {
-                            text: i18n("Pair a Device…")
-                            icon.name: "list-add"
-                            onTriggered: KDEConnect.OpenConfig.openConfiguration()
-                            enabled: pairedDevicesModel.count === 0
-                        }
-
-                        PlasmaComponents3.Button {
-                            Layout.leftMargin: Kirigami.Units.gridUnit * 3
-                            Layout.rightMargin: Kirigami.Units.gridUnit * 3
-                            Layout.alignment: Qt.AlignHCenter
-                            Layout.fillWidth: true
-                            visible: allDevicesModel.count === 0
-                            text: i18n("Install from Google Play")
-                            onClicked: Qt.openUrlExternally("https://play.google.com/store/apps/details?id=org.kde.kdeconnect_tp")
-                        }
-
-                        PlasmaComponents3.Button {
-                            Layout.leftMargin: Kirigami.Units.gridUnit * 3
-                            Layout.rightMargin: Kirigami.Units.gridUnit * 3
-                            Layout.alignment: Qt.AlignHCenter
-                            Layout.fillWidth: true
-                            visible: allDevicesModel.count === 0
-                            text: i18n("Install from F-Droid")
-                            onClicked: Qt.openUrlExternally("https://f-droid.org/en/packages/org.kde.kdeconnect_tp/")
-                        }
+                iconName: {
+                    if (pairedDevicesModel.count >= 0) {
+                        return pairedDevicesModel.count === 0 ? "edit-none-symbolic" : "network-disconnect-symbolic";
                     }
+                    return "kdeconnect";
+                }
+
+                text: {
+                    if (pairedDevicesModel.count >= 0) {
+                        return pairedDevicesModel.count === 0
+                            ? i18n("No paired devices")
+                            : i18np("Paired device is unavailable", "All paired devices are unavailable", pairedDevicesModel.count);
+                    } else if (allDevicesModel.count === 0) {
+                        return i18n("Install KDE Connect on your Android device to integrate it with Plasma!");
+                    }
+                    return "";
+                }
+
+                helpfulAction: pairedDevicesModel.count === 0 ? ({
+                    text: i18n("Pair a Device…"),
+                    onTriggered: () => KDEConnect.OpenConfig.openConfiguration()
+                }) : null
+
+                CachyButton {
+                    Layout.alignment: Qt.AlignHCenter
+                    visible: allDevicesModel.count === 0
+                    text: i18n("Install from Google Play")
+                    onClicked: Qt.openUrlExternally("https://play.google.com/store/apps/details?id=org.kde.kdeconnect_tp")
+                }
+
+                CachyButton {
+                    Layout.alignment: Qt.AlignHCenter
+                    visible: allDevicesModel.count === 0
+                    text: i18n("Install from F-Droid")
+                    onClicked: Qt.openUrlExternally("https://f-droid.org/en/packages/org.kde.kdeconnect_tp/")
                 }
             }
         }

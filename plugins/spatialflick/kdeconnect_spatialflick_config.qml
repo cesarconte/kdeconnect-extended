@@ -2,18 +2,27 @@
  * SPDX-FileCopyrightText: 2026 Cesar <yugurta@gmail.com>
  *
  * SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
+ *
+ * Spatial Flick plugin configuration page, migrated to the CachyOS.UI design
+ * system (Golden Gate / Liquid Glass).
  */
 
-import QtQuick 2.15
-import QtQuick.Controls 2.15 as QQC2
-import QtQuick.Layouts 1.15
-import org.kde.kirigami 2.20 as Kirigami
-import org.kde.kdeconnect 1.0
+import QtQuick
+import QtQuick.Controls as QQC2
+import QtQuick.Layouts
+import org.kde.kdeconnect
+import CachyOS.UI
 
-Kirigami.ScrollablePage {
+CachyFormCardPage {
     id: root
 
     property string device
+
+    KdeConnectPluginConfig {
+        id: config
+        deviceId: root.device
+        pluginName: "kdeconnect_spatialflick"
+    }
 
     Component.onCompleted: {
         portalEnabledCheck.checked = config.getBool("portalEnabled", true)
@@ -25,45 +34,64 @@ Kirigami.ScrollablePage {
         else edgeCombo.currentIndex = 0
     }
 
-    Kirigami.FormLayout {
-        KdeConnectPluginConfig {
-            id: config
-            deviceId: device
-            pluginName: "kdeconnect_spatialflick"
-        }
+    CachyFormHeader {
+        Layout.fillWidth: true
+        title: i18nd("kdeconnect-plugins", "Spatial Flick & Drop (Transferencia Direccional):")
+    }
 
-        QQC2.Label {
-            text: i18nd("kdeconnect-plugins", "Spatial Flick & Drop (Transferencia Direccional):")
-            font.bold: true
-        }
+    CachyFormCard {
+        Layout.fillWidth: true
 
-        QQC2.CheckBox {
+        CachyFormCheckDelegate {
             id: portalEnabledCheck
             text: i18nd("kdeconnect-plugins", "Habilitar portal de borde de pantalla para arrastre de archivos")
-            onClicked: config.set("portalEnabled", checked)
-        }
-
-        QQC2.ComboBox {
-            id: edgeCombo
-            Kirigami.FormData.label: i18nd("kdeconnect-plugins", "Borde de la pantalla donde se ubica el móvil:")
-            model: [
-                i18nd("kdeconnect-plugins", "Borde Derecho (predeterminado)"),
-                i18nd("kdeconnect-plugins", "Borde Izquierdo"),
-                i18nd("kdeconnect-plugins", "Borde Superior"),
-                i18nd("kdeconnect-plugins", "Borde Inferior")
-            ]
-            onActivated: {
-                if (index === 1) config.set("edgePosition", "left")
-                else if (index === 2) config.set("edgePosition", "top")
-                else if (index === 3) config.set("edgePosition", "bottom")
-                else config.set("edgePosition", "right")
+            onToggled: (next) => {
+                checked = next
+                config.set("portalEnabled", next)
             }
         }
 
-        QQC2.CheckBox {
+        CachyFormDelegateSeparator {}
+
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: CachyTheme.spacingMedium
+
+            Text {
+                Layout.fillWidth: true
+                Layout.minimumWidth: 0
+                text: i18nd("kdeconnect-plugins", "Borde de la pantalla donde se ubica el móvil:")
+                wrapMode: Text.WordWrap
+                font.pixelSize: 12
+                color: CachyTheme.textPrimary
+            }
+
+            QQC2.ComboBox {
+                id: edgeCombo
+                model: [
+                    i18nd("kdeconnect-plugins", "Borde Derecho (predeterminado)"),
+                    i18nd("kdeconnect-plugins", "Borde Izquierdo"),
+                    i18nd("kdeconnect-plugins", "Borde Superior"),
+                    i18nd("kdeconnect-plugins", "Borde Inferior")
+                ]
+                onActivated: (index) => {
+                    if (index === 1) config.set("edgePosition", "left")
+                    else if (index === 2) config.set("edgePosition", "top")
+                    else if (index === 3) config.set("edgePosition", "bottom")
+                    else config.set("edgePosition", "right")
+                }
+            }
+        }
+
+        CachyFormDelegateSeparator {}
+
+        CachyFormCheckDelegate {
             id: soundEnabledCheck
             text: i18nd("kdeconnect-plugins", "Efectos de sonido al transferir archivos")
-            onClicked: config.set("soundEnabled", checked)
+            onToggled: (next) => {
+                checked = next
+                config.set("soundEnabled", next)
+            }
         }
     }
 }

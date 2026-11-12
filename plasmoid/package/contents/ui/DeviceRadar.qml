@@ -1,6 +1,9 @@
 /**
  * SPDX-FileCopyrightText: 2026 Cesar <yugurta@gmail.com>
  * SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
+ *
+ * Proximity radar view of the KDE Connect plasmoid, migrated to the CachyOS.UI
+ * design system (Golden Gate / Liquid Glass).
  */
 
 pragma ComponentBehavior: Bound
@@ -12,20 +15,19 @@ import QtCore
 
 import org.kde.kdeconnect as KDEConnect
 import org.kde.kirigami as Kirigami
-import org.kde.plasma.components as PlasmaComponents3
-import org.kde.plasma.extras as PlasmaExtras
+import CachyOS.UI
 
 ColumnLayout {
     id: root
 
     required property KDEConnect.DevicesModel devicesModel
 
-    implicitWidth: Kirigami.Units.gridUnit * 22
-    implicitHeight: Kirigami.Units.gridUnit * 24
+    implicitWidth: 396
+    implicitHeight: 432
     Layout.fillWidth: true
     Layout.fillHeight: true
 
-    spacing: Kirigami.Units.smallSpacing
+    spacing: CachyTheme.spacingSmall
 
     // Configuración de visibilidad de proximidad
     // 0 = Nadie, 1 = Sólo conocidos, 2 = Todos (10 min)
@@ -40,22 +42,22 @@ ColumnLayout {
         onTriggered: {
             root.countdownSeconds -= 1
             if (root.countdownSeconds <= 0) {
-                root.visibilityMode = 1; // Volver a sólo conocidos automáticamente
+                root.visibilityMode = 1;
             }
         }
     }
 
     // Subtítulo explicativo con respuesta dinámica al arrastrar archivos
-    PlasmaComponents3.Label {
+    Text {
         Layout.fillWidth: true
-        Layout.topMargin: Kirigami.Units.smallSpacing
+        Layout.topMargin: CachyTheme.spacingSmall
         horizontalAlignment: Text.AlignHCenter
-        text: radarDropArea.containsDrag 
-            ? i18n("¡Suelta el archivo para enviarlo al dispositivo!") 
+        text: radarDropArea.containsDrag
+            ? i18n("¡Suelta el archivo para enviarlo al dispositivo!")
             : i18n("Arrastra y suelta un archivo desde Dolphin o tu escritorio aquí.")
-        font.pointSize: Kirigami.Theme.smallFont.pointSize
+        font.pixelSize: 11
         font.bold: radarDropArea.containsDrag
-        color: radarDropArea.containsDrag ? Kirigami.Theme.highlightColor : Kirigami.Theme.disabledTextColor
+        color: radarDropArea.containsDrag ? CachyTheme.accentColor : CachyTheme.textMuted
         wrapMode: Text.WordWrap
     }
 
@@ -64,14 +66,13 @@ ColumnLayout {
         id: radarArea
         Layout.fillWidth: true
         Layout.fillHeight: true
-        Layout.minimumHeight: Kirigami.Units.gridUnit * 14
+        Layout.minimumHeight: 252
         clip: true
 
         readonly property real centerX: width / 2
         readonly property real centerY: height / 2
-        readonly property real maxRadius: Math.max(Kirigami.Units.gridUnit * 4, Math.min(width, height) / 2 - Kirigami.Units.gridUnit * 1.5)
+        readonly property real maxRadius: Math.max(72, Math.min(width, height) / 2 - 27)
 
-        // DropArea global para todo el radar (sin filtro keys para aceptar arrastres nativos de Dolphin y Wayland)
         DropArea {
             id: radarDropArea
             anchors.fill: parent
@@ -113,7 +114,7 @@ ColumnLayout {
                 height: width
                 radius: width / 2
                 color: "transparent"
-                border.color: Kirigami.Theme.highlightColor
+                border.color: CachyTheme.accentColor
                 border.width: radarDropArea.containsDrag ? 2.5 : 1.5
                 opacity: 0.5
 
@@ -154,7 +155,7 @@ ColumnLayout {
             height: width
             radius: width / 2
             color: "transparent"
-            border.color: Kirigami.Theme.textColor
+            border.color: CachyTheme.textPrimary
             opacity: 0.08
             border.width: 1
         }
@@ -165,7 +166,7 @@ ColumnLayout {
             height: width
             radius: width / 2
             color: "transparent"
-            border.color: Kirigami.Theme.textColor
+            border.color: CachyTheme.textPrimary
             opacity: 0.05
             border.width: 1
         }
@@ -174,35 +175,31 @@ ColumnLayout {
         Rectangle {
             id: localHostNode
             anchors.centerIn: parent
-            width: Kirigami.Units.iconSizes.large + Kirigami.Units.smallSpacing * 2
+            width: 56
             height: width
             radius: width / 2
-            color: Kirigami.Theme.backgroundColor
-            border.color: Kirigami.Theme.highlightColor
+            color: CachyTheme.cardBackground
+            border.color: CachyTheme.accentColor
             border.width: 2
             z: 10
 
             Kirigami.Icon {
                 anchors.centerIn: parent
                 source: "computer"
-                implicitWidth: Kirigami.Units.iconSizes.medium
-                implicitHeight: Kirigami.Units.iconSizes.medium
-                color: Kirigami.Theme.highlightColor
+                implicitWidth: 32
+                implicitHeight: 32
+                color: CachyTheme.accentColor
             }
 
             Rectangle {
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
-                width: Kirigami.Units.smallSpacing * 2.5
+                width: 12
                 height: width
                 radius: width / 2
-                color: Kirigami.Theme.positiveTextColor
-                border.color: Kirigami.Theme.backgroundColor
+                color: "#34C759"
+                border.color: CachyTheme.cardBackground
                 border.width: 1.5
-            }
-
-            PlasmaComponents3.ToolTip {
-                text: i18n("Este equipo (Visible)")
             }
         }
 
@@ -217,15 +214,14 @@ ColumnLayout {
                 required property int index
 
                 readonly property int totalCount: devicesRepeater.count
-                // Distribuir equitativamente en círculo
                 readonly property real angle: totalCount > 0 ? (index * (2 * Math.PI / totalCount)) - (Math.PI / 2) : 0
-                readonly property real orbitRadius: Math.max(radarArea.maxRadius * 0.72, Kirigami.Units.gridUnit * 5.0)
+                readonly property real orbitRadius: Math.max(radarArea.maxRadius * 0.72, 90)
 
                 x: radarArea.centerX + orbitRadius * Math.cos(angle) - width / 2
                 y: radarArea.centerY + orbitRadius * Math.sin(angle) - height / 2
 
-                width: Kirigami.Units.gridUnit * 5
-                height: Kirigami.Units.gridUnit * 5.5
+                width: 90
+                height: 98
                 z: 20
 
                 readonly property string devId: model.deviceId ?? ""
@@ -246,10 +242,8 @@ ColumnLayout {
                     sentTimer.restart();
                 }
 
-                // Plugin Share asociado
                 property KDEConnect.ShareDbusInterface sharePlugin: devId ? KDEConnect.ShareDbusInterfaceFactory.create(devId) : null
 
-                // Zona de Drag & Drop por dispositivo
                 DropArea {
                     id: nodeDropArea
                     anchors.fill: parent
@@ -288,15 +282,15 @@ ColumnLayout {
                     Rectangle {
                         id: avatarCircle
                         Layout.alignment: Qt.AlignHCenter
-                        width: Kirigami.Units.iconSizes.large + 6
+                        width: 54
                         height: width
                         radius: width / 2
-                        color: nodeDropArea.containsDrag 
-                            ? Kirigami.Theme.highlightColor 
-                            : (deviceNode.justSent ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.cardBackgroundColor)
-                        border.color: nodeDropArea.containsDrag 
-                            ? Kirigami.Theme.highlightColor 
-                            : (deviceNode.isReachable ? Kirigami.Theme.highlightColor : Kirigami.Theme.disabledTextColor)
+                        color: nodeDropArea.containsDrag
+                            ? CachyTheme.accentColor
+                            : (deviceNode.justSent ? "#34C759" : CachyTheme.cardBackground)
+                        border.color: nodeDropArea.containsDrag
+                            ? CachyTheme.accentColor
+                            : (deviceNode.isReachable ? CachyTheme.accentColor : CachyTheme.textMuted)
                         border.width: nodeDropArea.containsDrag ? 3 : 1.5
 
                         Behavior on scale {
@@ -306,124 +300,106 @@ ColumnLayout {
                         Kirigami.Icon {
                             anchors.centerIn: parent
                             source: deviceNode.justSent ? "dialog-ok" : deviceNode.devIcon
-                            implicitWidth: Kirigami.Units.iconSizes.medium
-                            implicitHeight: Kirigami.Units.iconSizes.medium
-                            color: (nodeDropArea.containsDrag || deviceNode.justSent) ? Kirigami.Theme.highlightedTextColor : Kirigami.Theme.textColor
+                            implicitWidth: 32
+                            implicitHeight: 32
+                            color: (nodeDropArea.containsDrag || deviceNode.justSent) ? "#FFFFFF" : CachyTheme.textPrimary
                         }
 
-                        // Indicador de conexión
                         Rectangle {
                             anchors.right: parent.right
                             anchors.bottom: parent.bottom
-                            width: Kirigami.Units.smallSpacing * 2
+                            width: 10
                             height: width
                             radius: width / 2
-                            color: deviceNode.isReachable ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.neutralTextColor
-                            border.color: Kirigami.Theme.backgroundColor
+                            color: deviceNode.isReachable ? "#34C759" : "#FF9500"
+                            border.color: CachyTheme.cardBackground
                             border.width: 1
                         }
                     }
 
-                    PlasmaComponents3.Label {
+                    Text {
                         Layout.fillWidth: true
                         horizontalAlignment: Text.AlignHCenter
                         text: deviceNode.devName
-                        font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        font.pixelSize: 11
+                        color: CachyTheme.textPrimary
                         elide: Text.ElideRight
                         maximumLineCount: 1
                     }
 
-                    PlasmaComponents3.Label {
+                    Text {
                         Layout.fillWidth: true
                         horizontalAlignment: Text.AlignHCenter
                         text: deviceNode.justSent
                             ? i18n("¡Enviado!")
                             : (nodeDropArea.containsDrag ? i18n("¡Soltar aquí!") : (deviceNode.isReachable ? i18n("Conectado") : i18n("Fuera de alcance")))
-                        font.pointSize: Math.max(7, Kirigami.Theme.smallFont.pointSize - 2)
+                        font.pixelSize: 10
                         font.bold: nodeDropArea.containsDrag || deviceNode.justSent
-                        color: deviceNode.justSent 
-                            ? Kirigami.Theme.positiveTextColor 
-                            : (nodeDropArea.containsDrag ? Kirigami.Theme.highlightColor : Kirigami.Theme.disabledTextColor)
+                        color: deviceNode.justSent
+                            ? "#34C759"
+                            : (nodeDropArea.containsDrag ? CachyTheme.accentColor : CachyTheme.textMuted)
                     }
                 }
             }
         }
 
-        // Mensaje cuando no hay dispositivos en alcance
-        PlasmaExtras.PlaceholderMessage {
+        CachyPlaceholderMessage {
             anchors.centerIn: parent
             width: parent.width * 0.75
             visible: devicesRepeater.count === 0
             iconName: "network-wireless"
             text: i18n("Buscando dispositivos cercanos…")
-            explanation: i18n("Asegúrate de que los otros equipos tengan KDE Connect activo en la misma red o Bluetooth.")
         }
     }
 
-    // Controles inferiores: Selector de Visibilidad de proximidad (Estilo macOS AirDrop)
+    // Controles inferiores: Selector de Visibilidad de proximidad
     ColumnLayout {
         Layout.fillWidth: true
         Layout.alignment: Qt.AlignHCenter
-        Layout.bottomMargin: Kirigami.Units.smallSpacing
+        Layout.bottomMargin: CachyTheme.spacingSmall
         spacing: 4
 
-        PlasmaComponents3.Label {
+        Text {
             text: root.visibilityMode === 2 && root.countdownSeconds > 0
                 ? i18n("Permitir que me descubran: Todos (%1s)", root.countdownSeconds)
                 : i18n("Permitir que me descubran:")
             font.bold: true
-            font.pointSize: Math.max(8, Kirigami.Theme.smallFont.pointSize - 1)
-            color: Kirigami.Theme.disabledTextColor
+            font.pixelSize: 11
+            color: CachyTheme.textMuted
             Layout.alignment: Qt.AlignHCenter
         }
 
-        Rectangle {
+        RowLayout {
             Layout.fillWidth: true
-            Layout.preferredHeight: Kirigami.Units.gridUnit * 2.2
-            radius: Kirigami.Units.cornerRadius
-            color: Kirigami.Theme.backgroundColor
-            border.color: Kirigami.ColorUtils.linearInterpolation(Kirigami.Theme.backgroundColor, Kirigami.Theme.textColor, 0.15)
-            border.width: 1
+            spacing: CachyTheme.spacingSmall
 
-            RowLayout {
-                anchors.fill: parent
-                anchors.margins: 2
-                spacing: 2
+            CachyToolbarButton {
+                Layout.fillWidth: true
+                text: i18n("Nadie")
+                iconName: "dialog-cancel"
+                checkable: true
+                checked: root.visibilityMode === 0
+                onClicked: root.visibilityMode = 0
+            }
 
-                PlasmaComponents3.ToolButton {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    text: i18n("Nadie")
-                    icon.name: "dialog-cancel"
-                    checkable: true
-                    checked: root.visibilityMode === 0
-                    font.pointSize: Kirigami.Theme.smallFont.pointSize
-                    onClicked: root.visibilityMode = 0
-                }
+            CachyToolbarButton {
+                Layout.fillWidth: true
+                text: i18n("Contactos")
+                iconName: "user-identity"
+                checkable: true
+                checked: root.visibilityMode === 1
+                onClicked: root.visibilityMode = 1
+            }
 
-                PlasmaComponents3.ToolButton {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    text: i18n("Contactos")
-                    icon.name: "user-identity"
-                    checkable: true
-                    checked: root.visibilityMode === 1
-                    font.pointSize: Kirigami.Theme.smallFont.pointSize
-                    onClicked: root.visibilityMode = 1
-                }
-
-                PlasmaComponents3.ToolButton {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    text: i18n("Todos (10m)")
-                    icon.name: "system-users"
-                    checkable: true
-                    checked: root.visibilityMode === 2
-                    font.pointSize: Kirigami.Theme.smallFont.pointSize
-                    onClicked: {
-                        root.visibilityMode = 2
-                        root.countdownSeconds = 600
-                    }
+            CachyToolbarButton {
+                Layout.fillWidth: true
+                text: i18n("Todos (10m)")
+                iconName: "system-users"
+                checkable: true
+                checked: root.visibilityMode === 2
+                onClicked: {
+                    root.visibilityMode = 2
+                    root.countdownSeconds = 600
                 }
             }
         }

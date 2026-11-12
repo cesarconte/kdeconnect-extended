@@ -2,61 +2,93 @@
  * SPDX-FileCopyrightText: 2019 Nicolas Fella <nicolas.fella@gmx.de>
  *
  * SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
+ *
+ * Send-notifications plugin configuration page, migrated to the CachyOS.UI
+ * design system (Golden Gate / Liquid Glass).
  */
 
-import QtQuick 2.2
-import QtQuick.Controls 2.2
-import QtQuick.Layouts 1.1
-import org.kde.kirigami 2.5 as Kirigami
-import org.kde.kdeconnect 1.0
+import QtQuick
+import QtQuick.Controls as QQC2
+import QtQuick.Layouts
+import org.kde.kdeconnect
+import CachyOS.UI
 
-Kirigami.ScrollablePage {
+CachyFormCardPage {
     id: root
 
     property string device
 
-    Kirigami.FormLayout {
-        KdeConnectPluginConfig {
-            id: config
-            deviceId: root.device
-            pluginName: "kdeconnect_sendnotifications"
-        }
+    KdeConnectPluginConfig {
+        id: config
+        deviceId: root.device
+        pluginName: "kdeconnect_sendnotifications"
+    }
 
-        Component.onCompleted: {
-            persistent.checked = config.getBool("generalPersistent", false)
-            includeBody.checked = config.getBool("generalIncludeBody", true)
-            includeIcon.checked = config.getBool("generalSynchronizeIcons", true)
-            urgency.value = config.getInt("generalUrgency", 0)
-        }
+    Component.onCompleted: {
+        persistent.checked = config.getBool("generalPersistent", false)
+        includeBody.checked = config.getBool("generalIncludeBody", true)
+        includeIcon.checked = config.getBool("generalSynchronizeIcons", true)
+        urgency.value = config.getInt("generalUrgency", 0)
+    }
 
-        CheckBox {
+    CachyFormCard {
+        Layout.fillWidth: true
+
+        CachyFormCheckDelegate {
             id: persistent
             text: i18nd("kdeconnect-plugins", "Persistent notifications only")
             focus: true
-            onClicked: config.set("generalPersistent", checked)
+            onToggled: (next) => {
+                checked = next
+                config.set("generalPersistent", next)
+            }
             KeyNavigation.down: includeBody
         }
 
-        CheckBox {
+        CachyFormDelegateSeparator {}
+
+        CachyFormCheckDelegate {
             id: includeBody
             text: i18nd("kdeconnect-plugins", "Include body")
-            onClicked: config.set("generalIncludeBody", checked)
+            onToggled: (next) => {
+                checked = next
+                config.set("generalIncludeBody", next)
+            }
             KeyNavigation.down: includeIcon
         }
 
-        CheckBox {
+        CachyFormDelegateSeparator {}
+
+        CachyFormCheckDelegate {
             id: includeIcon
             text: i18nd("kdeconnect-plugins", "Include icon")
-            onClicked: config.set("generalSynchronizeIcons", checked)
+            onToggled: (next) => {
+                checked = next
+                config.set("generalSynchronizeIcons", next)
+            }
             KeyNavigation.down: urgency
         }
 
-        SpinBox {
-            id: urgency
-            Kirigami.FormData.label: i18nd("kdeconnect-plugins", "Minimum urgency level:")
-            from: 0
-            to: 2
-            onValueModified: config.set("generalUrgency", value)
+        CachyFormDelegateSeparator {}
+
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: CachyTheme.spacingMedium
+
+            Text {
+                Layout.fillWidth: true
+                Layout.minimumWidth: 0
+                text: i18nd("kdeconnect-plugins", "Minimum urgency level:")
+                font.pixelSize: 12
+                color: CachyTheme.textPrimary
+            }
+
+            QQC2.SpinBox {
+                id: urgency
+                from: 0
+                to: 2
+                onValueModified: config.set("generalUrgency", value)
+            }
         }
     }
 }

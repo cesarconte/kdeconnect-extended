@@ -1,17 +1,19 @@
 /**
  * SPDX-FileCopyrightText: 2026 Cesar <yugurta@gmail.com>
  * SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
+ *
+ * Activity banner of the KDE Connect plasmoid, migrated to the CachyOS.UI
+ * design system (Golden Gate / Liquid Glass).
  */
 
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import QtQuick.Controls as QQC2
 import QtQuick.Layouts
 
 import org.kde.kdeconnect as KDEConnect
 import org.kde.kirigami as Kirigami
-import org.kde.plasma.components as PlasmaComponents3
+import CachyOS.UI
 
 Rectangle {
     id: root
@@ -29,14 +31,14 @@ Rectangle {
     signal dismissRequested()
 
     visible: hasActivity
-    implicitHeight: layout.implicitHeight + Kirigami.Units.smallSpacing * 2
-    radius: Kirigami.Units.smallSpacing * 1.5
-    color: Kirigami.Theme.cardBackgroundColor
-    border.color: Kirigami.Theme.highlightColor
+    implicitHeight: layout.implicitHeight + (CachyTheme.spacingSmall * 2)
+    radius: CachyTheme.radiusMedium
+    color: CachyTheme.cardBackground
+    border.color: CachyTheme.accentColor
     border.width: 1
 
     Behavior on opacity {
-        NumberAnimation { duration: Kirigami.Units.shortDuration }
+        NumberAnimation { duration: CachyTheme.animFast }
     }
 
     Instantiator {
@@ -90,43 +92,47 @@ Rectangle {
     RowLayout {
         id: layout
         anchors.fill: parent
-        anchors.margins: Kirigami.Units.smallSpacing
-        spacing: Kirigami.Units.smallSpacing
+        anchors.margins: CachyTheme.spacingSmall
+        spacing: CachyTheme.spacingSmall
 
         Kirigami.Icon {
             source: "internet-web-browser"
-            implicitWidth: Kirigami.Units.iconSizes.medium
-            implicitHeight: Kirigami.Units.iconSizes.medium
-            color: Kirigami.Theme.highlightColor
+            implicitWidth: 24
+            implicitHeight: 24
+            color: CachyTheme.accentColor
         }
 
         ColumnLayout {
             Layout.fillWidth: true
+            Layout.minimumWidth: 0
             spacing: 1
 
-            PlasmaComponents3.Label {
+            Text {
                 text: root.deviceName.length > 0
                     ? i18n("Continuar en este equipo desde %1", root.deviceName)
                     : i18n("Continuar en este equipo")
                 font.bold: true
-                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                font.pixelSize: 11
+                color: CachyTheme.textPrimary
                 elide: Text.ElideRight
                 Layout.fillWidth: true
+                Layout.minimumWidth: 0
             }
 
-            PlasmaComponents3.Label {
+            Text {
                 text: root.activityTitle.length > 0 ? root.activityTitle : root.activityUrl
-                font.pointSize: Kirigami.Theme.smallFont.pointSize
-                color: Kirigami.Theme.disabledTextColor
+                font.pixelSize: 11
+                color: CachyTheme.textMuted
                 elide: Text.ElideRight
                 Layout.fillWidth: true
+                Layout.minimumWidth: 0
             }
         }
 
-        PlasmaComponents3.Button {
+        CachyButton {
             text: i18n("Abrir")
-            icon.name: "document-open"
-            highlighted: true
+            iconName: "document-open"
+            primary: true
             onClicked: {
                 if (root.activeWatcher && root.activeWatcher.handoffIface) {
                     root.activeWatcher.handoffIface.openCurrentActivity();
@@ -138,12 +144,9 @@ Rectangle {
             }
         }
 
-        PlasmaComponents3.ToolButton {
-            icon.name: "dialog-close"
-            display: PlasmaComponents3.AbstractButton.IconOnly
-            PlasmaComponents3.ToolTip {
-                text: i18n("Descartar actividad")
-            }
+        CachyToolbarButton {
+            iconName: "dialog-close"
+            tooltipText: i18n("Descartar actividad")
             onClicked: {
                 if (root.activeWatcher && root.activeWatcher.handoffIface) {
                     root.activeWatcher.handoffIface.clearActivity();

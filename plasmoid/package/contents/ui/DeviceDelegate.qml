@@ -4,22 +4,26 @@
  * SPDX-FileCopyrightText: 2026 Lito Parra <lito.15@proton.me>
  *
  * SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
+ *
+ * Device delegate of the KDE Connect plasmoid, migrated to the CachyOS.UI
+ * design system (Golden Gate / Liquid Glass).
  */
 
 pragma ComponentBehavior: Bound
 
 import QtCore
 import QtQuick
+import QtQuick.Controls as QQC2
 import QtQuick.Dialogs as QtDialogs
 import QtQuick.Layouts
 
 import org.kde.kdeconnect as KDEConnect
 import org.kde.kirigami as Kirigami
-import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.extras as PlasmaExtras
+import CachyOS.UI
 
-PlasmaComponents.ItemDelegate {
+QQC2.ItemDelegate {
     id: root
 
     required property int index
@@ -32,9 +36,14 @@ PlasmaComponents.ItemDelegate {
     hoverEnabled: true
     down: false
 
-    background: Item {}
+    background: Rectangle {
+        radius: CachyTheme.radiusMedium
+        color: CachyTheme.cardBackground
+        border.width: 1
+        border.color: CachyTheme.specularBorder
+    }
 
-    padding: Kirigami.Units.smallSpacing
+    padding: CachyTheme.spacingSmall
 
     Battery {
         id: battery
@@ -81,11 +90,8 @@ PlasmaComponents.ItemDelegate {
         device: root.device
     }
 
-    Kirigami.PromptDialog {
+    CachyDialog {
         id: prompt
-        visible: false
-        showCloseButton: true
-        standardButtons: Kirigami.Dialog.NoButton
         title: i18n("Virtual Monitor is not available")
     }
 
@@ -104,7 +110,6 @@ PlasmaComponents.ItemDelegate {
         visualParent: overflowMenu
         placement: PlasmaExtras.Menu.BottomPosedLeftAlignedPopup
 
-        // Share
         PlasmaExtras.MenuItem {
             icon: "document-share"
             visible: share.available
@@ -112,48 +117,32 @@ PlasmaComponents.ItemDelegate {
             onClicked: fileDialog.open()
         }
 
-        // Clipboard
         PlasmaExtras.MenuItem {
             icon: "klipper"
             visible: clipboard.clipboard?.isAutoShareDisabled ?? false
             text: i18n("Send Clipboard")
-
-            onClicked: {
-                clipboard.sendClipboard()
-            }
+            onClicked: clipboard.sendClipboard()
         }
 
-        // Find my phone
         PlasmaExtras.MenuItem {
             icon: "irc-voice"
             visible: findmyphone.available
             text: i18n("Ring my phone")
-
-            onClicked: {
-                findmyphone.ring()
-            }
+            onClicked: findmyphone.ring()
         }
 
-        // SFTP
         PlasmaExtras.MenuItem {
             icon: "document-open-folder"
             visible: sftp.available
             text: i18n("Browse this device")
-
-            onClicked: {
-                sftp.browse()
-            }
+            onClicked: sftp.browse()
         }
 
-        // SMS
         PlasmaExtras.MenuItem {
             icon: "message-new"
             visible: sms.available
             text: i18n("SMS Messages")
-
-            onClicked: {
-                sms.plugin.launchApp()
-            }
+            onClicked: sms.plugin.launchApp()
         }
     }
 
@@ -171,13 +160,13 @@ PlasmaComponents.ItemDelegate {
     }
 
     contentItem: ColumnLayout {
-        spacing: Kirigami.Units.smallSpacing
+        spacing: CachyTheme.spacingSmall
 
-        PlasmaComponents.ItemDelegate {
+        QQC2.ItemDelegate {
             id: deviceHeaderContainer
             hoverEnabled: true
             padding: 0
-            topPadding: Kirigami.Units.smallSpacing
+            topPadding: CachyTheme.spacingSmall
             bottomPadding: topPadding
 
             Layout.fillWidth: true
@@ -185,132 +174,112 @@ PlasmaComponents.ItemDelegate {
 
             background: Item {}
 
-            // ToolTipArea covering entire header area
             PlasmaCore.ToolTipArea {
                 anchors.fill: parent
-                z: -1  // Behind content so it doesn't block interactions
-                
-                // Show only when hovering empty space (not hovering any interactive buttons)
-                active: deviceHeaderContainer.hovered && !overflowMenu.hovered && !virtualMonitorButton.hovered && !dismissAllButton.hovered
+                z: -1
+                active: deviceHeaderContainer.hovered && !overflowMenu.isHovered && !virtualMonitorButton.isHovered && !dismissAllButton.isHovered
                 mainText: i18n("File Transfer")
                 subText: i18n("Drop a file to transfer it onto your phone.")
             }
 
-            // Real device header
             contentItem: ColumnLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 Layout.alignment: Qt.AlignVCenter
-                spacing: Kirigami.Units.smallSpacing
-
+                spacing: CachyTheme.spacingSmall
                 Layout.margins: 0
 
                 RowLayout {
-                    // Device name
-                    Kirigami.Heading {
+                    spacing: CachyTheme.spacingSmall
+
+                    CachyHeading {
                         text: root.model.name
-                        level: 2
+                        level: 3
                         elide: Text.ElideRight
                         maximumLineCount: 1
-
-                        leftPadding: LayoutMirroring.enabled ? 0 : Kirigami.Units.smallSpacing
-                        rightPadding: LayoutMirroring.enabled ? Kirigami.Units.smallSpacing : 0
+                        leftPadding: LayoutMirroring.enabled ? 0 : CachyTheme.spacingSmall
+                        rightPadding: LayoutMirroring.enabled ? CachyTheme.spacingSmall : 0
                     }
 
-                    // Spacer - pushes indicators/buttons to the right. Explicitly non-interactive.
                     Item {
                         Layout.fillWidth: true
-                        enabled: false  // Will not capture mouse/hover/drop events
+                        enabled: false
                     }
 
-                    // Remote screen icon
-                    PlasmaComponents.ToolButton {
+                    CachyToolbarButton {
                         id: virtualMonitorButton
-                        icon.name: "krdc"
-                        icon.width: Kirigami.Units.iconSizes.small
-                        icon.height: Kirigami.Units.iconSizes.small
+                        iconName: "krdc"
                         visible: virtualmonitor.available
-                        display: PlasmaComponents.AbstractButton.IconOnly
                         checked: visible && !!virtualmonitor.plugin?.active
                         checkable: true
-                        
-                        hoverEnabled: true
-                        PlasmaComponents.ToolTip.text: i18n("Virtual Display")
+                        tooltipText: i18n("Virtual Display")
 
                         onClicked: {
                             if (virtualmonitor.plugin.active) {
                                 virtualmonitor.plugin.stop();
-                                prompt.visible = false;
+                                prompt.close();
                             } else {
                                 virtualmonitor.plugin.requestVirtualMonitor();
                                 prompt.subtitle = virtualmonitor.plugin.lastError;
-                                prompt.visible = prompt.subtitle.length > 0;
+                                if (prompt.subtitle.length > 0) {
+                                    prompt.open();
+                                }
                             }
                         }
                     }
 
                     RowLayout {
                         id: connectionInformation
-
                         visible: connectivity.available
-                        spacing: Kirigami.Units.smallSpacing
-
-                        // TODO: Add more signal strength icons to represent all the available
-                        // connections.
+                        spacing: CachyTheme.spacingTiny
 
                         Kirigami.Icon {
                             id: celluarConnectionStrengthIcon
                             source: connectivity.iconName
-                            Layout.preferredHeight: Kirigami.Units.iconSizes.small
-                            Layout.preferredWidth: Layout.preferredHeight
+                            Layout.preferredHeight: 16
+                            Layout.preferredWidth: 16
                             Layout.alignment: Qt.AlignCenter
                             visible: valid
                         }
 
-
-                        PlasmaComponents.Label {
-                            // Fallback plain-text label. Only show this if the icon doesn't work.
+                        Text {
                             id: connectivityText
                             text: connectivity.displayString
                             textFormat: Text.PlainText
+                            font.pixelSize: 11
+                            color: CachyTheme.textSecondary
                             visible: !celluarConnectionStrengthIcon.visible
                         }
                     }
 
                     RowLayout {
                         id: batteryInformation
-
                         visible: battery.available && battery.hasBattery
-                        spacing: Kirigami.Units.smallSpacing
+                        spacing: CachyTheme.spacingTiny
 
                         Kirigami.Icon {
                             id: batteryIcon
                             source: battery.iconName
-                            Layout.preferredHeight: Kirigami.Units.iconSizes.small
-                            Layout.preferredWidth: Layout.preferredHeight
+                            Layout.preferredHeight: 16
+                            Layout.preferredWidth: 16
                             Layout.alignment: Qt.AlignCenter
                         }
 
-                        PlasmaComponents.Label {
+                        Text {
                             id: batteryPercent
                             text: i18nc("Battery charge percentage", "%1%", battery.charge)
                             textFormat: Text.PlainText
+                            font.pixelSize: 11
+                            color: CachyTheme.textSecondary
                         }
                     }
 
-                    PlasmaComponents.ToolButton {
+                    CachyToolbarButton {
                         id: overflowMenu
-                        icon.name: "application-menu"
-                        Layout.preferredHeight: Kirigami.Units.iconSizes.medium
-                        Layout.preferredWidth: Layout.preferredHeight
-
-                        highlighted: hovered
-
-                        PlasmaComponents.ToolTip.text: i18n("More options…")
-
+                        iconName: "application-menu"
+                        tooltipText: i18n("More options…")
                         onClicked: menu.openRelative()
                     }
-
                 }
 
                 // Notifications Header
@@ -318,112 +287,103 @@ PlasmaComponents.ItemDelegate {
                     visible: notificationsModel.count > 0
                     Layout.fillWidth: true
                     Layout.margins: 0
-                    spacing: Kirigami.Units.smallSpacing
+                    spacing: CachyTheme.spacingSmall
 
                     TapHandler {
                         onTapped: root.notificationsExpanded = !root.notificationsExpanded
                         cursorShape: Qt.PointingHandCursor
                     }
 
-                    // Collapse/Expand indicator - clickable
                     Kirigami.Icon {
                         id: collapseIcon
                         source: LayoutMirroring.enabled ? "arrow-left" : "arrow-right"
-                        Layout.preferredHeight: Kirigami.Units.iconSizes.small
-                        Layout.preferredWidth: Layout.preferredHeight
-                        color: Kirigami.Theme.textColor
+                        Layout.preferredHeight: 16
+                        Layout.preferredWidth: 16
+                        color: CachyTheme.textPrimary
 
-                        rotation: root.notificationsExpanded ? LayoutMirroring.enabled? -90 : 90 : 0
+                        rotation: root.notificationsExpanded ? (LayoutMirroring.enabled ? -90 : 90) : 0
 
                         Behavior on rotation {
                             NumberAnimation {
-                                duration: Kirigami.Units.shortDuration
+                                duration: CachyTheme.animFast
                                 easing.type: Easing.InOutQuad
                             }
                         }
                     }
 
-                    // Collapsable list tab marker
-                    PlasmaComponents.Label {
+                    Text {
                         text: i18n("Notifications")
+                        font.pixelSize: 12
+                        font.weight: Font.Medium
+                        color: CachyTheme.textPrimary
                         Layout.fillWidth: true
                     }
 
-                    PlasmaComponents.ToolButton {
+                    CachyToolbarButton {
                         id: dismissAllButton
                         enabled: true
-                        visible: notificationsModel.isAnyDismissable;
-                        icon.name: "edit-clear-history"
-                        icon.width: Kirigami.Units.iconSizes.smallMedium
-                        icon.height: Kirigami.Units.iconSizes.smallMedium
-
-                        PlasmaComponents.ToolTip.text: i18n("Dismiss all notifications")
-                        onClicked: dismissAllAnimation.start();
+                        visible: notificationsModel.isAnyDismissable
+                        iconName: "edit-clear-history"
+                        tooltipText: i18n("Dismiss all notifications")
+                        onClicked: dismissAllAnimation.start()
                     }
                 }
             }
         }
 
         // RemoteKeyboard
-        PlasmaComponents.ItemDelegate {
+        RowLayout {
             visible: remoteKeyboard.remoteState
             Layout.fillWidth: true
+            spacing: CachyTheme.spacingSmall
 
-            contentItem: RowLayout {
-                width: parent.width
-                spacing: 5
+            Text {
+                id: remoteKeyboardLabel
+                text: i18n("Remote Keyboard")
+                font.pixelSize: 12
+                color: CachyTheme.textSecondary
+            }
 
-                PlasmaComponents.Label {
-                    id: remoteKeyboardLabel
-                    text: i18n("Remote Keyboard")
-                }
-
-                KDEConnect.RemoteKeyboard {
-                    id: remoteKeyboard
-                    device: root.device
-                    Layout.fillWidth: true
-                }
+            KDEConnect.RemoteKeyboard {
+                id: remoteKeyboard
+                device: root.device
+                Layout.fillWidth: true
             }
         }
 
         Item {
             id: notificationsContainer
             Layout.fillWidth: true
-            Layout.leftMargin: 0
-            Layout.rightMargin: 0
-            Layout.bottomMargin: 0
-            Layout.topMargin: Kirigami.Units.smallSpacing
+            Layout.topMargin: CachyTheme.spacingSmall
             Layout.preferredHeight: root.notificationsExpanded ? notificationsColumn.implicitHeight : 0
             clip: true
             visible: notificationsModel.count > 0
 
             Behavior on Layout.preferredHeight {
                 NumberAnimation {
-                    duration: Kirigami.Units.shortDuration
+                    duration: CachyTheme.animFast
                     easing.type: Easing.InOutQuad
                 }
             }
 
-            // Dismiss all animation - slides and fades out the entire container
             SequentialAnimation {
                 id: dismissAllAnimation
-                NumberAnimation { 
+                NumberAnimation {
                     target: notificationsColumn
                     property: "x"
                     to: notificationsContainer.LayoutMirroring.enabled ? -notificationsContainer.width : notificationsContainer.width
-                    duration: Kirigami.Units.shortDuration
+                    duration: CachyTheme.animFast
                 }
-                ScriptAction { 
+                ScriptAction {
                     script: {
                         notificationsModel.dismissAll();
                     }
                 }
                 PauseAnimation {
-                    duration: 50 // Small delay to ensure model update propagates
+                    duration: 50
                 }
                 ScriptAction {
                     script: {
-                        // Only reset if all notifications are gone
                         if (notificationsModel.count === 0) {
                             notificationsColumn.x = 0;
                         }
@@ -435,22 +395,20 @@ PlasmaComponents.ItemDelegate {
                 id: notificationsColumn
                 width: parent.width
 
-                // Animate items moving to new positions when others are removed
                 move: Transition {
                     NumberAnimation {
                         properties: "y"
-                        duration: Kirigami.Units.shortDuration
+                        duration: CachyTheme.animFast
                         easing.type: Easing.OutInQuad
                     }
                 }
 
-                // Smooth fade in for new items
                 add: Transition {
                     NumberAnimation {
                         properties: "opacity"
                         from: 0
                         to: 1
-                        duration: Kirigami.Units.shortDuration
+                        duration: CachyTheme.animFast
                     }
                 }
 
@@ -462,8 +420,7 @@ PlasmaComponents.ItemDelegate {
                         deviceId: root.model.deviceId
                     }
 
-                    // Notification item
-                    delegate: PlasmaComponents.ItemDelegate {
+                    delegate: QQC2.ItemDelegate {
                         id: listitem
 
                         required property int index
@@ -472,46 +429,45 @@ PlasmaComponents.ItemDelegate {
                         hoverEnabled: true
                         width: parent.width
                         height: implicitHeight
-
                         clip: true
 
-                        // Control animation suppression (for instant collapsing)
                         property bool _suppressAnimations: false
 
-                        topPadding: index != 0 ? Kirigami.Units.mediumSpacing * 2 : 0
-                        bottomPadding: index != notificationsModel.count - 1 ? Kirigami.Units.mediumSpacing * 2 : 0
-                        leftPadding: LayoutMirroring.enabled ? 0 : Kirigami.Units.smallSpacing
-                        rightPadding: LayoutMirroring.enabled ? Kirigami.Units.smallSpacing : 0
-
+                        topPadding: index != 0 ? CachyTheme.spacingMedium : 0
+                        bottomPadding: index != notificationsModel.count - 1 ? CachyTheme.spacingMedium : 0
+                        leftPadding: LayoutMirroring.enabled ? 0 : CachyTheme.spacingSmall
+                        rightPadding: LayoutMirroring.enabled ? CachyTheme.spacingSmall : 0
                         Layout.margins: 0
 
-                        // Dismiss with animation
                         SequentialAnimation {
                             id: dismissAnimation
-                            NumberAnimation { target: listitem; property: "x"; to: listitem.LayoutMirroring.enabled ? -width : width; duration: Kirigami.Units.shortDuration }
-                            ScriptAction { script: listitem.model.dbusInterface.dismiss() }
+                            NumberAnimation {
+                                target: listitem
+                                property: "x"
+                                to: listitem.LayoutMirroring.enabled ? -listitem.width : listitem.width
+                                duration: CachyTheme.animFast
+                            }
+                            ScriptAction {
+                                script: listitem.model.dbusInterface.dismiss()
+                            }
                         }
 
                         Behavior on height {
                             enabled: !listitem._suppressAnimations
                             NumberAnimation {
-                                duration: Kirigami.Units.shortDuration
+                                duration: CachyTheme.animFast
                                 easing.type: Easing.InOutQuad
                             }
                         }
 
                         background: Item {}
 
-                        Kirigami.Theme.colorSet: Kirigami.Theme.View
-                        Kirigami.Theme.inherit: false
-
                         enabled: true
                         onClicked: checked = !checked
 
-                        // Timer to delay collapse until list animation finishes
                         Timer {
                             id: collapseDelayTimer
-                            interval: Kirigami.Units.shortDuration  // Match the list collapse duration
+                            interval: CachyTheme.animFast
                             onTriggered: {
                                 listitem._suppressAnimations = true
                                 listitem.checked = false
@@ -519,8 +475,6 @@ PlasmaComponents.ItemDelegate {
                             }
                         }
 
-                        // Collapse if notification list is collapsed
-                        // Watch for list expansion state changes
                         Connections {
                             target: root
                             function onNotificationsExpandedChanged() {
@@ -535,37 +489,40 @@ PlasmaComponents.ItemDelegate {
                         property bool replying: false
 
                         contentItem: ColumnLayout {
-                            spacing: Kirigami.Units.smallSpacing
+                            spacing: CachyTheme.spacingSmall
 
                             RowLayout {
-                                spacing: Kirigami.Units.largeSpacing
+                                spacing: CachyTheme.spacingMedium
                                 Layout.alignment: Qt.AlignTop
 
                                 ColumnLayout {
+                                    Layout.fillWidth: true
+                                    Layout.minimumWidth: 0
                                     Layout.alignment: Qt.AlignTop
 
                                     RowLayout {
                                         id: notificationHead
-                                        spacing: Kirigami.Units.largeSpacing
+                                        spacing: CachyTheme.spacingMedium
                                         Layout.alignment: Qt.AlignTop
 
                                         ColumnLayout {
-                                            // Couple together so Dismiss and Reply have enough room
-                                            spacing: Kirigami.Units.smallSpacing
+                                            Layout.fillWidth: true
+                                            Layout.minimumWidth: 0
+                                            spacing: CachyTheme.spacingTiny
 
-                                            // Notification and icon
                                             RowLayout {
                                                 Layout.alignment: Qt.AlignVCenter
+                                                spacing: CachyTheme.spacingSmall
 
                                                 Kirigami.Icon {
                                                     id: notificationIcon
                                                     source: listitem.model.appIcon
-                                                    Layout.preferredWidth: Kirigami.Units.iconSizes.smallMedium
-                                                    Layout.preferredHeight: Kirigami.Units.iconSizes.smallMedium
+                                                    Layout.preferredWidth: 18
+                                                    Layout.preferredHeight: 18
                                                     Layout.alignment: Qt.AlignVCenter
                                                 }
 
-                                                Kirigami.Heading {
+                                                CachyHeading {
                                                     id: notificationAppName
                                                     text: listitem.model.appName
                                                     textFormat: Text.PlainText
@@ -575,101 +532,91 @@ PlasmaComponents.ItemDelegate {
                                                     wrapMode: Text.Wrap
                                                     Layout.alignment: Qt.AlignVCenter
                                                     Layout.fillWidth: true
-
-                                                    color: Kirigami.ColorUtils.tintWithAlpha(
-                                                        Kirigami.Theme.backgroundColor,
-                                                        Kirigami.Theme.textColor,
-                                                        0.85
-                                                    )
+                                                    Layout.minimumWidth: 0
+                                                    color: CachyTheme.textSecondary
                                                 }
                                             }
 
-                                            // Notification title
-                                            Kirigami.Heading {
+                                            CachyHeading {
                                                 id: notificationTitle
                                                 text: listitem.model.title
                                                 textFormat: Text.PlainText
-                                                level: 2
-                                                type: Kirigami.Heading.Type.Primary
+                                                level: 3
                                                 visible: text.length > 0
                                                 elide: listitem.checked ? Text.ElideNone : Text.ElideRight
                                                 maximumLineCount: listitem.checked ? 0 : 1
                                                 wrapMode: Text.Wrap
                                                 Layout.fillWidth: true
+                                                Layout.minimumWidth: 0
                                             }
                                         }
 
-                                        PlasmaComponents.ToolButton {
+                                        CachyToolbarButton {
                                             id: replyButton
                                             visible: listitem.model.repliable
                                             enabled: listitem.model.repliable && !listitem.replying
-                                            icon.name: "mail-reply-sender"
-                                            icon.width: Kirigami.Units.iconSizes.smallMedium
-                                            icon.height: Kirigami.Units.iconSizes.smallMedium
-                                            PlasmaComponents.ToolTip.text: i18n("Reply")
+                                            iconName: "mail-reply-sender"
+                                            tooltipText: i18n("Reply")
                                             onClicked: {
                                                 listitem.replying = true;
                                                 replyTextField.forceActiveFocus();
                                             }
-
                                             Layout.alignment: Qt.AlignTop
                                         }
 
-                                        PlasmaComponents.ToolButton {
+                                        CachyToolbarButton {
                                             id: dismissButton
-                                            visible: notificationsModel.isAnyDismissable;
+                                            visible: notificationsModel.isAnyDismissable
                                             enabled: listitem.model.dismissable
                                             Layout.alignment: Qt.AlignTop
-                                            icon.name: "window-close"
-                                            icon.width: Kirigami.Units.iconSizes.smallMedium
-                                            icon.height: Kirigami.Units.iconSizes.smallMedium
-                                            PlasmaComponents.ToolTip.text: i18n("Dismiss")
+                                            iconName: "window-close"
+                                            tooltipText: i18n("Dismiss")
                                             onClicked: dismissAnimation.start()
                                         }
                                     }
 
-                                    PlasmaComponents.Label {
+                                    Text {
                                         id: notificationNotitext
                                         text: listitem.model.notitext
                                         visible: text.length > 0
                                         elide: listitem.checked ? Text.ElideNone : Text.ElideRight
                                         maximumLineCount: listitem.checked ? 0 : 1
                                         wrapMode: Text.Wrap
+                                        font.pixelSize: 12
+                                        color: CachyTheme.textPrimary
                                         Layout.fillWidth: true
+                                        Layout.minimumWidth: 0
                                     }
                                 }
                             }
 
                             RowLayout {
                                 visible: listitem.replying
-                                spacing: Kirigami.Units.smallSpacing
-                                Layout.topMargin: Kirigami.Units.smallSpacing
+                                spacing: CachyTheme.spacingSmall
+                                Layout.topMargin: CachyTheme.spacingSmall
                                 Layout.fillWidth: true
 
-                                PlasmaComponents.ToolButton {
+                                CachyToolbarButton {
                                     id: replyCancelButton
                                     Layout.alignment: Qt.AlignBottom
-                                    text: i18n("Cancel")
-                                    padding: replyTextField.padding
-                                    display: PlasmaComponents.AbstractButton.IconOnly
-                                    PlasmaComponents.ToolTip {
-                                        text: replyCancelButton.text
-                                    }
-                                    icon.name: "dialog-cancel"
+                                    tooltipText: i18n("Cancel")
+                                    iconName: "dialog-cancel"
                                     onClicked: {
                                         replyTextField.text = "";
                                         listitem.replying = false;
                                     }
                                 }
 
-                                PlasmaComponents.TextArea {
+                                CachyTextField {
                                     id: replyTextField
                                     placeholderText: i18nc("@info:placeholder", "Reply to %1…", listitem.model.appName)
-                                    wrapMode: TextEdit.Wrap
                                     Layout.fillWidth: true
+                                    Layout.minimumWidth: 0
                                     Keys.onPressed: event => {
                                         if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !(event.modifiers & Qt.ShiftModifier)) {
-                                            replySendButton.clicked();
+                                            if (replyTextField.text !== "") {
+                                                replySendButton.clicked();
+                                            }
                                             event.accepted = true;
                                         }
                                         if (event.key === Qt.Key_Escape) {
@@ -679,12 +626,12 @@ PlasmaComponents.ItemDelegate {
                                     }
                                 }
 
-                                PlasmaComponents.ToolButton {
+                                CachyToolbarButton {
                                     Layout.alignment: Qt.AlignBottom
                                     id: replySendButton
-                                    text: i18n("Send")
-                                    padding: replyTextField.padding
-                                    icon.name: LayoutMirroring.enabled ? "document-send-rtl" : "document-send"
+                                    tooltipText: i18n("Send")
+                                    iconName: LayoutMirroring.enabled ? "document-send-rtl" : "document-send"
+                                    primary: true
                                     enabled: replyTextField.text !== ""
                                     onClicked: {
                                         listitem.model.dbusInterface.sendReply(replyTextField.text);
@@ -695,12 +642,12 @@ PlasmaComponents.ItemDelegate {
                             }
                         }
 
-                        Kirigami.Separator {
+                        CachyDivider {
                             anchors.bottom: parent.bottom
                             anchors.horizontalCenter: parent.horizontalCenter
                             width: parent.width - deviceHeaderContainer.leftPadding - deviceHeaderContainer.rightPadding
-                            opacity: .5
-                            visible: index < notificationsModel.count - 1
+                            opacity: 0.5
+                            visible: listitem.index < notificationsModel.count - 1
                         }
                     }
                 }
@@ -710,18 +657,21 @@ PlasmaComponents.ItemDelegate {
         // Commands
         RowLayout {
             visible: remoteCommands.available && commandsModel.count > 0
-            width: parent.width
-            spacing: Kirigami.Units.smallSpacing
+            Layout.fillWidth: true
+            spacing: CachyTheme.spacingSmall
 
-            PlasmaComponents.Label {
+            Text {
                 text: i18n("Run command")
+                font.pixelSize: 12
+                font.weight: Font.Medium
+                color: CachyTheme.textPrimary
                 Layout.fillWidth: true
             }
 
-            PlasmaComponents.Button {
+            CachyToolbarButton {
                 id: addCommandButton
-                icon.name: "list-add"
-                PlasmaComponents.ToolTip.text: i18n("Add command")
+                iconName: "list-add"
+                tooltipText: i18n("Add command")
                 onClicked: remoteCommands.plugin.editCommands()
                 visible: remoteCommands.plugin?.canAddCommand ?? false
             }
@@ -729,7 +679,6 @@ PlasmaComponents.ItemDelegate {
 
         Repeater {
             id: commandsView
-
             visible: remoteCommands.available
 
             model: KDEConnect.RemoteCommandsModel {
@@ -737,22 +686,28 @@ PlasmaComponents.ItemDelegate {
                 deviceId: root.model.deviceId
             }
 
-            delegate: PlasmaComponents.ItemDelegate {
+            delegate: QQC2.ItemDelegate {
                 id: commandDelegate
 
                 required property int index
                 required property var model
 
                 enabled: true
+                Layout.fillWidth: true
+
+                background: Rectangle {
+                    radius: CachyTheme.radiusSmall
+                    color: commandDelegate.hovered ? CachyTheme.cardBackgroundHover : "transparent"
+                }
 
                 onClicked: {
                     remoteCommands.plugin?.triggerCommand(commandDelegate.model.key);
                 }
 
-                Layout.fillWidth: true
-
-                contentItem: PlasmaComponents.Label {
+                contentItem: Text {
                     text: `${commandDelegate.model.name}\n${commandDelegate.model.command}`
+                    font.pixelSize: 12
+                    color: CachyTheme.textPrimary
                 }
             }
         }

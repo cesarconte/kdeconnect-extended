@@ -1,57 +1,68 @@
 // SPDX-FileCopyrightText: 2022 Carl Schwan <carl@carlschwan.eu>
 // SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
+//
+// Settings page of the KDE Connect application, migrated to the CachyOS.UI
+// design system (Golden Gate / Liquid Glass).
 
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import org.kde.kirigami as Kirigami
-import org.kde.kirigamiaddons.formcard as FormCard
 import org.kde.kdeconnect
 import org.kde.kdeconnect.app
+import CachyOS.UI
 
-Kirigami.ScrollablePage
-{
+CachyScrollablePage {
     id: page
+
+    /// The stack of pages of the window: it is the one that owns the modal
+    /// layers where the "about" pages are shown.
+    property var pageStack: null
+
     title: i18nc("@title:window", "Settings")
 
-    ColumnLayout
-    {
+    DBusProperty {
+        id: announcedNameProperty
+        object: DaemonDbusInterface
+        read: "announcedName"
+        defaultValue: ""
+    }
 
-        FormCard.FormCard {
-            Layout.topMargin: Kirigami.Units.gridUnit
+    DBusProperty {
+        id: linkProvidersProperty
+        object: DaemonDbusInterface
+        read: "linkProviders"
+        defaultValue: []
+    }
 
-            FormCard.FormTextFieldDelegate {
+    ColumnLayout {
+        Layout.fillWidth: true
+        Layout.minimumWidth: 0
+        spacing: CachyTheme.spacingMedium
+
+        CachyFormCard {
+            Layout.fillWidth: true
+
+            CachyFormTextFieldDelegate {
                 id: deviceNameField
                 text: announcedNameProperty.value
-                onAccepted: DaemonDbusInterface.setAnnouncedName(text);
+                onAccepted: DaemonDbusInterface.setAnnouncedName(text)
                 label: i18n("Device name")
-
-                DBusProperty {
-                    id: announcedNameProperty
-                    object: DaemonDbusInterface
-                    read: "announcedName"
-                    defaultValue: ""
-                }
             }
         }
 
-        FormCard.FormHeader {
+        CachyFormHeader {
             title: i18nc("@title:group", "Backends")
+            Layout.fillWidth: true
         }
 
-        FormCard.FormCard {
-            DBusProperty {
-                id: linkProvidersProperty
-                object: DaemonDbusInterface
-                read: "linkProviders"
-                defaultValue: []
-            }
+        CachyFormCard {
+            Layout.fillWidth: true
             visible: linkProvidersProperty.value.length > 0
 
             Repeater {
                 model: linkProvidersProperty.value
 
-                FormCard.FormCheckDelegate {
+                CachyFormCheckDelegate {
                     required property string modelData
 
                     readonly property string displayName: modelData.split('|')[0]
@@ -60,40 +71,68 @@ Kirigami.ScrollablePage
                     checked: modelData.split('|')[2] === 'enabled'
                     text: displayName
 
-                    onToggled: DaemonDbusInterface.setLinkProviderState(internalName, checked);
+                    onToggled: (next) => DaemonDbusInterface.setLinkProviderState(internalName, next)
                 }
             }
         }
 
-        FormCard.FormCard {
-            Layout.topMargin: Kirigami.Units.gridUnit
+        CachyFormCard {
+            Layout.fillWidth: true
+            Layout.topMargin: CachyTheme.spacingMedium
 
-            FormCard.FormButtonDelegate {
+            CachyFormButtonDelegate {
                 text: i18n("About KDE Connect")
-                onClicked: applicationWindow().pageStack.layers.push(Qt.createComponent("org.kde.kirigamiaddons.formcard", "AboutPage"))
-                icon.name: 'kdeconnect'
+                icon.name: "kdeconnect"
+                onClicked: page.pageStack.layers.push(aboutApplication, {
+                    appTitle: i18n("KDE Connect"),
+                    appVersion: Qt.application.version,
+                    iconName: "kdeconnect",
+                    description: i18n("KDE Connect lets you share files, the clipboard, the notifications and the control of your devices between your computers and your mobile devices."),
+                    links: [
+                        { text: i18n("Homepage"), url: "https://kdeconnect.kde.org" },
+                        { text: i18n("Release notes"), url: "https://kdeconnect.kde.org/release-notes" }
+                    ]
+                })
             }
 
-            FormCard.FormDelegateSeparator {}
+            CachyFormDelegateSeparator {}
 
-            FormCard.FormButtonDelegate {
+            CachyFormButtonDelegate {
                 text: i18n("About KDE")
-                onClicked: applicationWindow().pageStack.layers.push(Qt.createComponent("org.kde.kirigamiaddons.formcard", "AboutKDEPage"))
-                icon.name: 'kde'
+                icon.name: "kde"
+                onClicked: page.pageStack.layers.push(aboutKDE, {
+                    appTitle: i18n("KDE"),
+                    iconName: "kde",
+                    description: i18n("KDE is an international community of people who build and use free software. You can learn more about it and support it."),
+                    links: [
+                        { text: i18n("Homepage"), url: "https://kde.org" },
+                        { text: i18n("Applications"), url: "https://apps.kde.org" }
+                    ]
+                })
             }
         }
     }
 
-    footer: ToolBar {
-        contentItem: RowLayout {
-            Item { Layout.fillWidth: true }
-            Button {
-                text: i18n("Close")
-                display: AbstractButton.TextOnly
-                onClicked: {
-                    DaemonDbusInterface.setAnnouncedName(deviceNameField.text);
-                    page.Kirigami.PageStack.closeDialog();
-                }
+    Component {
+        id: aboutApplication
+        CachyAboutPage {}
+    }
+
+    Component {
+        id: aboutKDE
+        CachyAboutPage {}
+    }
+
+    footer: Item {
+        implicitHeight: 56
+
+        CachyButton {
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.verticalCenter: parent.verticalCenter
+            text: i18n("Close")
+            onClicked: {
+                DaemonDbusInterface.setAnnouncedName(deviceNameField.text);
+                page.pageStack.layers.pop();
             }
         }
     }

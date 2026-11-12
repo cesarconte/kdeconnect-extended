@@ -2,55 +2,68 @@
  * SPDX-FileCopyrightText: 2018 Nicolas Fella <nicolas.fella@gmx.de>
  *
  * SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
+ *
+ * Remote commands page of the KDE Connect application, migrated to the
+ * CachyOS.UI design system (Golden Gate / Liquid Glass).
  */
 
 import QtQuick
-import QtQuick.Controls
-import QtQuick.Layouts
+import QtQuick.Controls as QQC2
 import org.kde.kirigami as Kirigami
 import org.kde.kdeconnect
+import CachyOS.UI
 
-Kirigami.ScrollablePage
-{
+Item {
     id: root
-    title: i18nd("kdeconnect-app", "Run command")
+
+    property string title: i18nd("kdeconnect-app", "Run command")
     property QtObject pluginInterface
     property QtObject device
 
-    actions: [
+    readonly property list<Kirigami.Action> headerActions: [
         Kirigami.Action {
             icon.name: "document-edit"
             text: i18nd("kdeconnect-app", "Edit commands")
             onTriggered: {
-                pluginInterface.editCommands();
-                showPassiveNotification(i18nd("kdeconnect-app", "You can edit commands on the connected device"));
+                root.pluginInterface.editCommands();
             }
         }
     ]
 
     ListView {
         id: commandsList
+        anchors.fill: parent
+        spacing: CachyTheme.spacingTiny
         model: RemoteCommandsModel {
-            deviceId: pluginInterface.deviceId
+            deviceId: root.pluginInterface.deviceId
         }
-        delegate: ItemDelegate {
+        delegate: QQC2.ItemDelegate {
             id: delegate
+            required property string name
+            required property string command
+            required property string key
+
             width: ListView.view.width
             text: name
 
-            contentItem: Kirigami.TitleSubtitle {
-                title: delegate.text
-                subtitle: command
+            contentItem: CachyIconTitleSubtitle {
+                title: delegate.name
+                subtitle: delegate.command
+                onClicked: delegate.clicked()
             }
 
-            onClicked: pluginInterface.triggerCommand(key)
-        }
+            background: Item {}
+            padding: 0
 
-        Kirigami.PlaceholderMessage {
-            visible: commandsList.count === 0
-            text: i18nd("kdeconnect-app", "No commands defined")
-            anchors.centerIn: parent
+            onClicked: root.pluginInterface.triggerCommand(delegate.key)
         }
     }
-}
 
+    CachyPlaceholderMessage {
+        anchors.centerIn: parent
+        width: parent.width - (CachyTheme.marginWindow * 2)
+        visible: commandsList.count === 0
+        iconName: "utilities-terminal"
+        text: i18nd("kdeconnect-app", "No commands defined")
+    }
+}

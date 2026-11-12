@@ -3,6 +3,9 @@
  * SPDX-FileCopyrightText: 2024 ivan tkachenko <me@ratijas.tk>
  *
  * SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
+ *
+ * Root item of the KDE Connect plasmoid, migrated to the CachyOS.UI design
+ * system (Golden Gate / Liquid Glass).
  */
 
 pragma ComponentBehavior: Bound
@@ -12,7 +15,6 @@ import QtQuick.Layouts
 
 import org.kde.config as KConfig
 import org.kde.kdeconnect as KDEConnect
-import org.kde.kirigami as Kirigami
 import org.kde.kquickcontrolsaddons as KQuickControlsAddons
 import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.plasmoid
@@ -51,10 +53,10 @@ PlasmoidItem {
         plasmoidItem: root
         Plasmoid.backgroundHints: root.inPanel ? PlasmaCore.Types.NoBackground : PlasmaCore.Types.DefaultBackground
         devicesModel: connectedDeviceModel
-        Layout.minimumWidth: Kirigami.Units.gridUnit * 19
-        Layout.minimumHeight: Kirigami.Units.gridUnit * 22
-        Layout.preferredWidth: Kirigami.Units.gridUnit * 22
-        Layout.preferredHeight: Kirigami.Units.gridUnit * 25
+        Layout.minimumWidth: 342
+        Layout.minimumHeight: 396
+        Layout.preferredWidth: 396
+        Layout.preferredHeight: 450
     }
 
     compactRepresentation: CompactRepresentation {

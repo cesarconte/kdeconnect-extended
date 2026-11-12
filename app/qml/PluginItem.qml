@@ -2,12 +2,11 @@
  * SPDX-FileCopyrightText: 2015 Aleix Pol Gonzalez <aleixpol@kde.org>
  *
  * SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
+ *
+ * Model of a plugin of a device, migrated to the CachyOS.UI design system.
  */
 
 import QtQuick
-import QtQuick.Controls
-import QtQuick.Layouts
-import org.kde.kirigami as Kirigami
 import org.kde.kdeconnect
 
 QtObject
@@ -24,11 +23,15 @@ QtObject
     property bool hidden: false
     property bool clickable: section !== "info" && loaded
 
+    /// The stack of pages of the window: it is used to open the page of the
+    /// component of the plugin.
+    property var pageStack: null
+
     readonly property var checker: PluginChecker {
         id: checker
     }
     property var onClick: () => {
-        if (component === "" || !interfaceFactory)
+        if (component === "" || !interfaceFactory || !pageStack)
             return;
 
         var obj = interfaceFactory.create(checker.device.id());

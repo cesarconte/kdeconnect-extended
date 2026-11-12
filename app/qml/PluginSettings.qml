@@ -2,64 +2,50 @@
  * SPDX-FileCopyrightText: 2019 Nicolas Fella <nicolas.fella@gmx.de>
  *
  * SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
+ *
+ * Plugin settings page of the KDE Connect application, migrated to the
+ * CachyOS.UI design system (Golden Gate / Liquid Glass).
  */
 
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Controls as QQC2
 import QtQuick.Layouts
-import org.kde.kirigami as Kirigami
 import org.kde.kitemmodels as KItemModels
 import org.kde.kdeconnect
+import CachyOS.UI
 
-Kirigami.ScrollablePage {
+CachyScrollablePage {
     id: root
 
     property string device
     property string filterString
     readonly property bool isPluginSettingsPage: true
 
+    /// The stack of pages of the window.
+    property var pageStack: null
+
     title: i18n("Plugin Settings")
 
     function openConfiguration(pluginName) {
         let source = pluginModel.pluginSource(pluginName);
-        console.log("source", source);
-        return devicePage = pageStack.push(source, {
+        if (!source || String(source).length === 0) {
+            return null;
+        }
+        return pageStack.push(source, {
             title: pluginModel.pluginDisplayName(pluginName),
             device: root.device,
         });
     }
 
-    header: Control {
-        topPadding: Kirigami.Units.smallSpacing
-        bottomPadding: Kirigami.Units.smallSpacing
-        leftPadding: Kirigami.Units.smallSpacing
-        rightPadding: Kirigami.Units.smallSpacing
-
-        background: Rectangle {
-            Kirigami.Theme.colorSet: Kirigami.Theme.Window
-            Kirigami.Theme.inherit: false
-            color: Kirigami.Theme.backgroundColor
-
-            Kirigami.Separator {
-                anchors {
-                    left: parent.left
-                    bottom: parent.bottom
-                    right: parent.right
-                }
-            }
+    header: CachySearchField {
+        id: searchField
+        onTextChanged: root.filterString = text;
+        focus: true
+        Keys.onDownPressed: event => {
+            pluginList.currentIndex = 0;
+            event.accepted = false; // Pass to KeyNavigation.down
         }
-
-        contentItem: Kirigami.SearchField {
-            id: searchField
-            onTextChanged: root.filterString = text;
-            autoAccept: false
-            focus: true
-            Keys.onDownPressed: event => {
-                pluginList.currentIndex = 0;
-                event.accepted = false; // Pass to KeyNavigation.down
-            }
-            KeyNavigation.down: pluginList
-        }
+        KeyNavigation.down: pluginList
     }
 
     ListView {
@@ -76,10 +62,11 @@ Kirigami.ScrollablePage {
             }
         }
 
-        delegate: ItemDelegate {
+        delegate: QQC2.ItemDelegate {
             id: pluginDelegate
 
             width: ListView.view.width
+            height: 56
 
             required property var model
 
@@ -92,55 +79,63 @@ Kirigami.ScrollablePage {
             Accessible.description: model.description
             Accessible.role: Accessible.CheckBox
 
-            onToggled: {
+            onClicked: {
                 pluginList.currentIndex = model.index
                 model.isChecked = !model.isChecked
             }
 
             contentItem: RowLayout {
-                CheckBox {
-                    id: serviceCheck
+                spacing: CachyTheme.spacingMedium
+
+                CachySwitch {
                     Layout.alignment: Qt.AlignVCenter
                     checked: pluginDelegate.model.isChecked
-
-                    activeFocusOnTab: false
-                    onToggled: {
-                        pluginDelegate.model.isChecked = checked
-                    }
-
-                    Accessible.ignored: true
+                    // The state belongs to the model: the switch only shows it.
+                    interactive: false
                 }
 
-                Kirigami.Icon {
-                    source: pluginDelegate.model.iconName
+                Image {
+                    Layout.preferredWidth: 22
+                    Layout.preferredHeight: 22
+                    Layout.alignment: Qt.AlignVCenter
+                    source: CachyTheme.iconUrl(pluginDelegate.model.iconName, "application-x-executable-symbolic")
+                    fillMode: Image.PreserveAspectFit
+                    smooth: true
                 }
 
                 ColumnLayout {
                     spacing: 0
                     Layout.fillWidth: true
+                    Layout.minimumWidth: 0
                     Layout.alignment: Qt.AlignVCenter
 
-                    Label {
+                    Text {
                         Layout.fillWidth: true
+                        Layout.minimumWidth: 0
                         text: pluginDelegate.model.name
                         elide: Text.ElideRight
+                        font.pixelSize: 13
+                        color: CachyTheme.textPrimary
                     }
 
-                    Label {
+                    Text {
                         Layout.fillWidth: true
+                        Layout.minimumWidth: 0
                         text: pluginDelegate.model.description
                         elide: Text.ElideRight
-                        font: Kirigami.Theme.smallFont
-                        opacity: 0.7
+                        font.pixelSize: 11
+                        color: CachyTheme.textMuted
                     }
                 }
 
-                ToolButton {
+                CachyToolbarButton {
                     id: settingsButton
 
+                    Layout.alignment: Qt.AlignVCenter
                     visible: pluginDelegate.model.configSource != ""
 
-                    icon.name: "settings-configure"
+                    iconName: "settings-configure-symbolic"
+                    tooltipText: i18n("Configure")
 
                     onClicked: {
                         pageStack.push(pluginDelegate.model.configSource, {
@@ -149,6 +144,11 @@ Kirigami.ScrollablePage {
                         });
                     }
                 }
+            }
+
+            background: Rectangle {
+                radius: CachyTheme.radiusSmall
+                color: pluginDelegate.hovered ? CachyTheme.cardBackgroundHover : "transparent"
             }
         }
     }

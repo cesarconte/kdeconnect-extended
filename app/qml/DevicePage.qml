@@ -2,6 +2,10 @@
  * SPDX-FileCopyrightText: 2015 Aleix Pol Gonzalez <aleixpol@kde.org>
  *
  * SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
+ *
+ * Device page of the KDE Connect application, migrated to the CachyOS.UI
+ * design system (Golden Gate / Liquid Glass): the page keeps the model of the
+ * plugins and the states of the pairing, only its appearance changes.
  */
 
 import QtQuick
@@ -12,11 +16,46 @@ import QtQuick.Dialogs
 import QtQml.Models
 import org.kde.kirigami as Kirigami
 import org.kde.kdeconnect
+import CachyOS.UI
 
-Kirigami.ScrollablePage {
+Item {
     id: root
+
+    /// The stack of pages of the window.
+    property var pageStack: null
+
     property QtObject currentDevice
-    title: currentDevice.name
+
+    readonly property string title: root.currentDevice ? root.currentDevice.name : ""
+
+    /// Actions of the page: they are shown in the header of the window.
+    readonly property list<Kirigami.Action> headerActions: [
+        Kirigami.Action {
+            icon.name: "network-disconnect-symbolic"
+            text: i18nd("kdeconnect-app", "Unpair")
+            visible: root.currentDevice && root.currentDevice.isPaired
+            onTriggered: {
+                root.currentDevice.unpair();
+                root.pageStack.pop();
+            }
+        },
+        Kirigami.Action {
+            icon.name: "system-run-symbolic"
+            text: i18nd("kdeconnect-app", "Send Ping")
+            visible: root.currentDevice && root.currentDevice.isPaired && root.currentDevice.isReachable
+            onTriggered: {
+                root.currentDevice.pluginCall("ping", "sendPing");
+            }
+        },
+        Kirigami.Action {
+            icon.name: "settings-configure-symbolic"
+            text: i18n("Plugin Settings")
+            visible: root.currentDevice && root.currentDevice.isPaired && root.currentDevice.isReachable
+            onTriggered: {
+                root.openSettings();
+            }
+        }
+    ]
 
     BatteryInfo {
         id: batteryInfo
@@ -32,7 +71,7 @@ Kirigami.ScrollablePage {
     {
         for (let index = 0; index < pageStack.depth; ++index) {
             const page = pageStack.get(index);
-            if (page.isPluginSettingsPage && page.device === currentDevice.id()) {
+            if (page && page.isPluginSettingsPage && page.device === currentDevice.id()) {
                 pageStack.currentIndex = index;
                 return page;
             }
@@ -40,43 +79,16 @@ Kirigami.ScrollablePage {
 
         return pageStack.push(
             Qt.resolvedUrl("PluginSettings.qml"),
-            {device: currentDevice.id()}
+            {device: currentDevice.id(), pageStack: root.pageStack}
         );
     }
 
-    actions: [
-        Kirigami.Action {
-            icon.name: "network-disconnect"
-            onTriggered: {
-                root.currentDevice.unpair()
-                pageStack.pop(0)
-            }
-            text: i18nd("kdeconnect-app", "Unpair")
-            visible: root.currentDevice && root.currentDevice.isPaired
-        },
-        Kirigami.Action {
-            icon.name: "hands-free"
-            text: i18nd("kdeconnect-app", "Send Ping")
-            visible: root.currentDevice && root.currentDevice.isPaired && root.currentDevice.isReachable
-            onTriggered: {
-                root.currentDevice.pluginCall("ping", "sendPing");
-            }
-        },
-        Kirigami.Action {
-            icon.name: "settings-configure"
-            text: i18n("Plugin Settings")
-            visible: root.currentDevice && root.currentDevice.isPaired && root.currentDevice.isReachable
-            onTriggered: {
-                root.openSettings();
-            }
-        }
-    ]
-
     ListView {
         id: pluginsListView
+        anchors.fill: parent
 
         section.property: "section"
-        section.delegate: Kirigami.ListSectionHeader {
+        section.delegate: CachySectionHeader {
             width: ListView.view.width
             text: switch (section) {
                 case "action":
@@ -108,13 +120,11 @@ Kirigami.ScrollablePage {
 
             delegate: QQC2.ItemDelegate {
                 id: pluginDelegate
-                text: Kirigami.MnemonicData.richTextLabel
                 Accessible.name: Kirigami.MnemonicData.plainTextLabel ?? modelData.name // fallback needed for KF < 6.12
                 Accessible.role: modelData.clickable ? Accessible.Button : Accessible.StaticText
-                icon.name: modelData.iconName
                 highlighted: modelData === sharePlugin && dropArea.containsDrag
-                icon.color: "transparent"
                 width: pluginsListView.width
+                height: 44
                 enabled: true
                 hoverEnabled: modelData.clickable
                 focusPolicy: modelData.clickable ? Qt.StrongFocus : Qt.NoFocus
@@ -131,6 +141,34 @@ Kirigami.ScrollablePage {
                 Shortcut {
                     sequence: pluginDelegate.Kirigami.MnemonicData.sequence
                     onActivated: clicked()
+                }
+
+                contentItem: RowLayout {
+                    spacing: CachyTheme.spacingMedium
+
+                    Image {
+                        Layout.preferredWidth: 22
+                        Layout.preferredHeight: 22
+                        source: CachyTheme.iconUrl(modelData.iconName, "application-x-executable-symbolic")
+                        fillMode: Image.PreserveAspectFit
+                        smooth: true
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        Layout.minimumWidth: 0
+                        text: pluginDelegate.Kirigami.MnemonicData.richTextLabel
+                        elide: Text.ElideRight
+                        font.pixelSize: 13
+                        color: CachyTheme.textPrimary
+                    }
+                }
+
+                background: Rectangle {
+                    radius: CachyTheme.radiusSmall
+                    color: pluginDelegate.highlighted
+                        ? CachyTheme.withAlpha(CachyTheme.accentColor, 0.16)
+                        : (pluginDelegate.hovered && modelData.clickable ? CachyTheme.cardBackgroundHover : "transparent")
                 }
 
                 MouseArea {
@@ -235,7 +273,7 @@ Kirigami.ScrollablePage {
                 device: root.currentDevice
             },
             PluginItem {
-                readonly property QtObject sftp: SftpDbusInterfaceFactory.create(root.currentDevice.id())
+                readonly property var sftp: SftpDbusInterfaceFactory.create(root.currentDevice.id())
                 pluginName: "sftp"
                 name: i18n("Browse this device")
                 onClick: () => sftp.startBrowsing();
@@ -243,7 +281,7 @@ Kirigami.ScrollablePage {
                 device: root.currentDevice
             },
             PluginItem {
-                readonly property QtObject virtualMonitor: VirtualmonitorDbusInterfaceFactory.create(root.currentDevice.id())
+                readonly property var virtualMonitor: VirtualmonitorDbusInterfaceFactory.create(root.currentDevice.id())
                 pluginName: "virtualmonitor"
                 name: virtualMonitor.active ? i18n("Stop virtual monitor session") : i18n("Use device as an external monitor")
                 onClick: () => {
@@ -294,52 +332,59 @@ Kirigami.ScrollablePage {
                 drop.accept(Qt.CopyAction)
             }
         }
+    }
 
-        Kirigami.PlaceholderMessage {
-            text: i18nd("kdeconnect-app", "This device is not paired.")
-            anchors.centerIn: parent
-            visible: root.currentDevice && root.currentDevice.isReachable && !root.currentDevice.isPaired && !root.currentDevice.isPairRequestedByPeer && !root.currentDevice.isPairRequested
-            helpfulAction: Kirigami.Action {
-                text: i18ndc("kdeconnect-app", "Request pairing with a given device", "Pair")
-                icon.name:"network-connect"
-                onTriggered: root.currentDevice.requestPairing()
+    // =====================================================================
+    // States of the pairing
+    // =====================================================================
+    CachyPlaceholderMessage {
+        anchors.centerIn: parent
+        width: parent.width - (CachyTheme.marginWindow * 2)
+        visible: root.currentDevice && root.currentDevice.isReachable && !root.currentDevice.isPaired && !root.currentDevice.isPairRequestedByPeer && !root.currentDevice.isPairRequested
+        text: i18nd("kdeconnect-app", "This device is not paired.")
+        helpfulAction: ({
+            text: i18ndc("kdeconnect-app", "Request pairing with a given device", "Pair"),
+            onTriggered: () => root.currentDevice.requestPairing()
+        })
+    }
+
+    CachyPlaceholderMessage {
+        anchors.centerIn: parent
+        width: parent.width - (CachyTheme.marginWindow * 2)
+        visible: root.currentDevice && root.currentDevice.isReachable && root.currentDevice.isPairRequested
+        text: i18nd("kdeconnect-app", "Pair requested\nKey: " + root.currentDevice.verificationKey)
+
+        QQC2.BusyIndicator {
+        }
+    }
+
+    CachyPlaceholderMessage {
+        anchors.centerIn: parent
+        width: parent.width - (CachyTheme.marginWindow * 2)
+        visible: root.currentDevice && root.currentDevice.isPairRequestedByPeer
+        text: i18n("Pair requested\nKey: " + root.currentDevice.verificationKey)
+
+        RowLayout {
+            spacing: CachyTheme.spacingSmall
+
+            CachyButton {
+                text: i18nd("kdeconnect-app", "Accept")
+                primary: true
+                onClicked: root.currentDevice.acceptPairing()
+            }
+
+            CachyButton {
+                text: i18nd("kdeconnect-app", "Reject")
+                onClicked: root.currentDevice.cancelPairing()
             }
         }
+    }
 
-        Kirigami.PlaceholderMessage {
-            text: i18nd("kdeconnect-app", "Pair requested\nKey: " + root.currentDevice.verificationKey)
-            anchors.centerIn: parent
-            visible: root.currentDevice && root.currentDevice.isReachable && root.currentDevice.isPairRequested
-            QQC2.BusyIndicator {
-                Layout.alignment: Qt.AlignHCenter
-            }
-        }
-
-        Kirigami.PlaceholderMessage {
-            text: i18n("Pair requested\nKey: " + root.currentDevice.verificationKey)
-            visible: root.currentDevice && root.currentDevice.isPairRequestedByPeer
-            anchors.centerIn: parent
-            spacing: Kirigami.Units.largeSpacing
-            RowLayout {
-                QQC2.Button {
-                    text: i18nd("kdeconnect-app", "Accept")
-                    icon.name:"dialog-ok"
-                    onClicked: root.currentDevice.acceptPairing()
-                }
-
-                QQC2.Button {
-                    text: i18nd("kdeconnect-app", "Reject")
-                    icon.name:"dialog-cancel"
-                    onClicked: root.currentDevice.cancelPairing()
-                }
-            }
-        }
-
-        Kirigami.PlaceholderMessage {
-            visible: root.currentDevice && !root.currentDevice.isReachable
-            text: i18nd("kdeconnect-app", "This device is not reachable")
-            anchors.centerIn: parent
-        }
+    CachyPlaceholderMessage {
+        anchors.centerIn: parent
+        width: parent.width - (CachyTheme.marginWindow * 2)
+        visible: root.currentDevice && !root.currentDevice.isReachable
+        text: i18nd("kdeconnect-app", "This device is not reachable")
     }
 
     FileDialog {
@@ -349,5 +394,16 @@ Kirigami.ScrollablePage {
         currentFolder: StandardPaths.standardLocations(StandardPaths.HomeLocation)[0]
         fileMode: FileDialog.OpenFiles
         onAccepted: shareIface.shareUrls(fileDialog.selectedFiles)
+    }
+
+    // The plugins need the stack of pages to open the page of their own
+    // component, so they are given it as soon as it is known.
+    onPageStackChanged: root.syncPlugins()
+    Component.onCompleted: root.syncPlugins()
+
+    function syncPlugins() {
+        for (const plugin of pluginsListView.plugins) {
+            plugin.pageStack = root.pageStack;
+        }
     }
 }

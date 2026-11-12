@@ -3,16 +3,18 @@
  * SPDX-FileCopyrightText: 2024 ivan tkachenko <me@ratijas.tk>
  *
  * SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
+ *
+ * Remote keyboard input field, migrated to the CachyOS.UI design system
+ * (Golden Gate / Liquid Glass).
  */
 
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import QtQuick.Controls as QQC2
-
 import org.kde.kdeconnect as KDEConnect
+import CachyOS.UI
 
-QQC2.TextField {
+CachyTextField {
     id: root
 
     property KDEConnect.DeviceDbusInterface device
@@ -33,8 +35,6 @@ QQC2.TextField {
         target: root.remoteKeyboard
 
         function onKeyPressReceived(key: string, specialKey: int, shift: bool, ctrl: bool, alt: bool, meta: bool): void {
-            //console.log("XXX received keypress key=" + key + " special=" + specialKey + " shift=" + shift + " ctrl=" + ctrl + " text=" + text + " cursorPos=" + cursorPosition);
-            // interpret some special keys:
             if (specialKey === 12 || specialKey === 14) { // Return/Esc -> clear
                 text = "";
             } else if (specialKey === 4 // Left
@@ -55,14 +55,13 @@ QQC2.TextField {
                 if (pos < text.length) {
                     text = text.substring(0, pos)
                         + text.substring(pos + 1, text.length);
-                    cursorPosition = pos; // seems to be set to text.length automatically!
+                    cursorPosition = pos;
                 }
             } else if (specialKey === 10) { // Home
                 cursorPosition = 0;
             } else if (specialKey == 11) { // End
                 cursorPosition = text.length;
             } else {
-                // echo visible keys
                 let sanitized = "";
                 for (let i = 0; i < key.length; i++) {
                     if (key.charCodeAt(i) > 31) {
@@ -70,21 +69,19 @@ QQC2.TextField {
                     }
                 }
                 if (sanitized.length > 0 && !ctrl && !alt && !meta) {
-                    // insert sanitized at current pos:
                     const pos = cursorPosition;
                     text = text.substring(0, pos)
                         + sanitized
                         + text.substring(pos, text.length);
-                    cursorPosition = pos + 1; // seems to be set to text.length automatically!
+                    cursorPosition = pos + 1;
                 }
             }
-            // console.log("XXX After received keypress key=" + key + " special=" + specialKey + " shift=" + shift + " ctrl=" + ctrl + " text=" + text + " cursorPos=" + cursorPosition);
         }
     }
 
     function sendEvent(event: KeyEvent): void {
         if (remoteKeyboard) {
-            const transEvent = JSON.parse(JSON.stringify(event)); // transform to anonymous object
+            const transEvent = JSON.parse(JSON.stringify(event));
             remoteKeyboard.sendQKeyEvent(transEvent);
             event.accepted = true
         }

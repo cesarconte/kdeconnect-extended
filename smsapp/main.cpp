@@ -24,10 +24,13 @@
 
 #include <QApplication>
 #include <QCommandLineParser>
+#include <QDir>
 #include <QIcon>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
+#include <QQuickWindow>
+#include <QTimer>
 #include <QWindow>
 
 #include "smshelper.h"
@@ -117,8 +120,11 @@ int main(int argc, char *argv[])
     aboutData.setupCommandLine(&parser);
     parser.addOption(QCommandLineOption(QStringLiteral("device"), i18n("Select a device"), i18n("id")));
     parser.addOption(QCommandLineOption(QStringLiteral("message"), i18n("Send a message"), i18n("message")));
+    QCommandLineOption screenshotOption(QStringLiteral("screenshot"), i18n("Capture a window screenshot and exit"), QStringLiteral("path"));
+    parser.addOption(screenshotOption);
     parser.process(app);
     aboutData.processCommandLine(&parser);
+    const QString screenshotPath = parser.value(screenshotOption);
 
     AppData data(parser.value(QStringLiteral("message")), parser.value(QStringLiteral("device")));
 
@@ -135,8 +141,19 @@ int main(int argc, char *argv[])
 
     QQmlApplicationEngine engine;
     KLocalization::setupLocalizedContext(&engine);
+    engine.addImportPath(QDir::homePath() + QStringLiteral("/.local/lib/qt6/qml"));
     engine.addImageProvider(QStringLiteral("thumbnailsProvider"), new ThumbnailsProvider);
     engine.loadFromModule("org.kde.kdeconnect.sms", "Main");
+
+    if (!screenshotPath.isEmpty() && !engine.rootObjects().isEmpty()) {
+        auto *obj = qobject_cast<QWindow *>(engine.rootObjects().constFirst());
+        QTimer::singleShot(600, obj, [obj, screenshotPath, &app]() {
+            if (auto *quickWindow = qobject_cast<QQuickWindow *>(obj)) {
+                quickWindow->grabWindow().save(screenshotPath);
+            }
+            app.quit();
+        });
+    }
 
     QObject::connect(&service, &KDBusService::activateRequested, &service, [&parser, &data, &engine](const QStringList &args, const QString & /*workDir*/) {
         parser.parse(args);

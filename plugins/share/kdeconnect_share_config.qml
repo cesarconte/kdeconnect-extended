@@ -2,65 +2,88 @@
  * SPDX-FileCopyrightText: 2019 Nicolas Fella <nicolas.fella@gmx.de>
  *
  * SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
+ *
+ * Share plugin configuration page, migrated to the CachyOS.UI design system
+ * (Golden Gate / Liquid Glass).
  */
 
-import QtQuick 2.15
-import QtQuick.Controls 2.15 as QQC2
-import QtQuick.Layouts 1.15
+import QtQuick
+import QtQuick.Layouts
 import QtQuick.Dialogs
 import QtCore
-import org.kde.kirigami 2.20 as Kirigami
-import org.kde.kdeconnect 1.0
+import org.kde.kirigami as Kirigami
+import org.kde.kdeconnect
+import CachyOS.UI
 
-Kirigami.ScrollablePage {
+CachyFormCardPage {
     id: root
 
     property string device
 
-    actions: Kirigami.Action {
-        icon.name: "dialog-ok"
-        text: i18nd("kdeconnect-plugins", "Apply")
-        onTriggered: config.set("incoming_path", path.text)
+    readonly property list<Kirigami.Action> headerActions: [
+        Kirigami.Action {
+            icon.name: "dialog-ok"
+            text: i18nd("kdeconnect-plugins", "Apply")
+            onTriggered: config.set("incoming_path", path.text)
+        }
+    ]
+
+    FolderDialog {
+        id: folderDialog
+        currentFolder: path.text
+
+        onAccepted: {
+            path.text = selectedFolder.toString().replace("file://", "")
+        }
     }
 
-    Kirigami.FormLayout {
-        FolderDialog {
-            id: folderDialog
-            currentFolder: path.text
+    KdeConnectPluginConfig {
+        id: config
+        deviceId: root.device
+        pluginName: "kdeconnect_share"
 
-            onAccepted: {
-                path.text = selectedFolder.toString().replace("file://", "")
-            }
+        onConfigChanged: {
+            path.text = getString("incoming_path", StandardPaths.writableLocation(StandardPaths.DownloadsLocation).toString().replace("file://", ""))
         }
+    }
 
-        KdeConnectPluginConfig {
-            id: config
-            deviceId: device
-            pluginName: "kdeconnect_share"
+    CachyFormCard {
+        Layout.fillWidth: true
 
-            onConfigChanged: {
-                path.text = getString("incoming_path", StandardPaths.writableLocation(StandardPaths.DownloadsLocation).toString().replace("file://", ""))
-            }
+        Text {
+            Layout.fillWidth: true
+            Layout.minimumWidth: 0
+            text: i18nd("kdeconnect-plugins", "Save files in:")
+            font.pixelSize: 12
+            color: CachyTheme.textSecondary
         }
 
         RowLayout {
-            Kirigami.FormData.label: i18nd("kdeconnect-plugins", "Save files in:")
+            Layout.fillWidth: true
+            spacing: CachyTheme.spacingSmall
 
-            QQC2.TextField {
+            CachyTextField {
                 id: path
+                Layout.fillWidth: true
+                Layout.minimumWidth: 0
                 focus: true
                 KeyNavigation.right: folderPickerButton
             }
 
-            QQC2.Button {
+            CachyButton {
                 id: folderPickerButton
-                icon.name: "document-open"
+                iconName: "document-open"
                 onClicked: folderDialog.open()
             }
         }
 
-        QQC2.Label {
+        Text {
+            Layout.fillWidth: true
+            Layout.minimumWidth: 0
             text: i18nd("kdeconnect-plugins", "%1 in the path will be replaced with the specific device name", "%1")
+            wrapMode: Text.WordWrap
+            font.pixelSize: 11
+            color: CachyTheme.textMuted
         }
     }
 }

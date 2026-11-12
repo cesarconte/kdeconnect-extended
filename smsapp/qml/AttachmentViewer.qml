@@ -2,21 +2,27 @@
  * SPDX-FileCopyrightText: 2020 Aniket Kumar <anikketkumar786@gmail.com>
  *
  * SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
+ *
+ * Attachment viewer page of the KDE Connect SMS application, migrated to the
+ * CachyOS.UI design system (Golden Gate / Liquid Glass).
  */
 
 import QtQuick
 import QtQuick.Layouts
-import QtQuick.Controls
 import org.kde.kirigami as Kirigami
+import org.kde.kdeconnect.sms
 import QtMultimedia
+import CachyOS.UI
 
-Kirigami.Page {
+Item {
     id: root
 
     property url fileUrl
     property string mimeType
+    property string title
+    property var pageStack: null
 
-    actions: [
+    readonly property list<Kirigami.Action> headerActions: [
         Kirigami.Action {
             text: i18nd("kdeconnect-sms", "Open with default")
             icon.name: "window-new"
@@ -34,28 +40,20 @@ Kirigami.Page {
         }
     ]
 
-    contentItem: Rectangle {
+    Rectangle {
         anchors.fill: parent
-        color: Kirigami.Theme.backgroundColor
+        radius: CachyTheme.radiusMedium
+        color: CachyTheme.sheetBackground
+        border.width: 1
+        border.color: CachyTheme.specularBorder
 
-        Rectangle {
-            id: imageViewer
-            visible: root.mimeType.match("image")
-            anchors.horizontalCenter: parent.horizontalCenter
-            width: image.width
-            height: parent.height - y
-            y: root.implicitHeaderHeight
-            color: parent.color
-
-            Image {
-                id: image
-                source: parent.visible ? root.fileUrl : ""
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.verticalCenter: parent.verticalCenter
-                width: sourceSize.width
-                height: parent.height
-                fillMode: Image.PreserveAspectFit
-            }
+        Image {
+            id: image
+            visible: Boolean(root.mimeType.match("image"))
+            source: visible ? root.fileUrl : ""
+            anchors.fill: parent
+            anchors.margins: CachyTheme.marginCard
+            fillMode: Image.PreserveAspectFit
         }
 
         MediaPlayer {
@@ -64,25 +62,25 @@ Kirigami.Page {
 
             onPositionChanged: {
                 if (mediaPlayer.position > 1000 && mediaPlayer.duration - mediaPlayer.position < 1000) {
-                    playAndPauseButton.icon.name = "media-playback-start"
+                    playAndPauseButton.iconName = "media-playback-start"
                     mediaPlayer.pause()
                     mediaPlayer.seek(0)
-                 }
+                }
             }
         }
 
         Item {
-            width: parent.width
-            height: parent.height - mediaControls.height
-            anchors.topMargin: root.implicitHeaderHeight
+            visible: Boolean(root.mimeType.match("video"))
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: mediaControls.top
 
             MediaPlayer {
                 source: mediaPlayer
                 videoOutput: VideoOutput {
                     anchors.fill: parent
                     fillMode: VideoOutput.PreserveAspectFit
-
-                    // By default QML's videoOutput element rotates the vdeeo files by 90 degrees in clockwise direction
                     orientation: -90
                 }
             }
@@ -90,56 +88,45 @@ Kirigami.Page {
 
         Rectangle {
             id: mediaControls
-            visible: root.mimeType.match("video")
+            visible: Boolean(root.mimeType.match("video"))
             width: parent.width
-            height: 50
+            height: 60
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.bottom: parent.bottom
-            color: Kirigami.Theme.backgroundColor
+            color: CachyTheme.cardBackground
 
-            Rectangle {
+            CachyDivider {
                 anchors.top: parent.top
-                width: parent.width
-                height: 1
-                color: "lightGray"
+                anchors.left: parent.left
+                anchors.right: parent.right
             }
 
             ColumnLayout {
-                anchors.horizontalCenter: parent.horizontalCenter
-                width: parent.width
+                anchors.fill: parent
+                anchors.margins: CachyTheme.spacingSmall
+                spacing: CachyTheme.spacingSmall
 
                 Rectangle {
                     id: progressBar
-                    Layout.fillWidth: parent
-                    Layout.leftMargin: Kirigami.Units.largeSpacing
-                    Layout.rightMargin: Kirigami.Units.largeSpacing
-                    Layout.topMargin: Kirigami.Units.smallSpacing
-                    radius: 5
-                    height: 5
-
-                    color: "gray"
+                    Layout.fillWidth: true
+                    radius: 3
+                    height: 6
+                    color: CachyTheme.withAlpha(CachyTheme.textPrimary, 0.14)
 
                     Rectangle {
                         anchors.left: parent.left
                         anchors.top: parent.top
                         anchors.bottom: parent.bottom
-                        radius: 5
-
-                        width: mediaPlayer.duration > 0 ? parent.width*mediaPlayer.position/mediaPlayer.duration : 0
-
-                        color: {
-                            Kirigami.Theme.colorSet = Kirigami.Theme.View
-                            var accentColor = Kirigami.Theme.highlightColor
-                            return Qt.tint(Kirigami.Theme.backgroundColor, Qt.rgba(accentColor.r, accentColor.g, accentColor.b, 1))
-                        }
+                        radius: 3
+                        width: mediaPlayer.duration > 0 ? parent.width * mediaPlayer.position / mediaPlayer.duration : 0
+                        color: CachyTheme.accentColor
                     }
 
                     MouseArea {
                         anchors.fill: parent
-
-                        onClicked: {
+                        onClicked: (mouse) => {
                             if (mediaPlayer.seekable) {
-                                mediaPlayer.seek(mediaPlayer.duration * mouse.x/width);
+                                mediaPlayer.seek(mediaPlayer.duration * mouse.x / width);
                             }
                         }
                     }
@@ -147,12 +134,11 @@ Kirigami.Page {
 
                 RowLayout {
                     Layout.alignment: Qt.AlignHCenter
-                    spacing: Kirigami.Units.largeSpacing
+                    spacing: CachyTheme.spacingMedium
 
-                    Button {
+                    CachyToolbarButton {
                         id: backwardButton
-                        icon.name: "media-seek-backward"
-
+                        iconName: "media-seek-backward"
                         onClicked: {
                             if (mediaPlayer.seekable) {
                                 mediaPlayer.seek(mediaPlayer.position - 2000)
@@ -160,25 +146,24 @@ Kirigami.Page {
                         }
                     }
 
-                    Button {
+                    CachyToolbarButton {
                         id: playAndPauseButton
-                        icon.name: "media-playback-pause"
-
+                        iconName: "media-playback-pause"
+                        primary: true
                         onClicked: {
-                            if (icon.name == "media-playback-start") {
+                            if (iconName == "media-playback-start") {
                                 mediaPlayer.play()
-                                icon.name = "media-playback-pause"
+                                iconName = "media-playback-pause"
                             } else {
                                 mediaPlayer.pause()
-                                icon.name = "media-playback-start"
+                                iconName = "media-playback-start"
                             }
                         }
                     }
 
-                    Button {
+                    CachyToolbarButton {
                         id: forwardButton
-                        icon.name: "media-seek-forward"
-
+                        iconName: "media-seek-forward"
                         onClicked: {
                             if (mediaPlayer.seekable) {
                                 mediaPlayer.seek(mediaPlayer.position + 2000)

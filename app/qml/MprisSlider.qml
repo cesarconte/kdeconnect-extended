@@ -2,12 +2,16 @@
  * SPDX-FileCopyrightText: 2019 Nicolas Fella <nicolas.fella@gmx.de>
  *
  * SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
+ *
+ * Multimedia progress and seek control, migrated to the CachyOS.UI design
+ * system (Golden Gate / Liquid Glass).
  */
 
 import QtQuick
-import QtQuick.Controls
+import CachyOS.UI
 
 Loader {
+    id: root
 
     property var plugin
     property var lastPosition: plugin.position
@@ -26,15 +30,15 @@ Loader {
     Component {
         id: seekBar
 
-        Slider {
+        CachySlider {
             from: 0
-            to: plugin.length
+            to: root.plugin.length
             onPressedChanged: {
                 if (pressed) {
-                    updatePositionSlider = false
+                    root.updatePositionSlider = false
                 } else {
-                    updatePositionSlider = true
-                    plugin.position = value
+                    root.updatePositionSlider = true
+                    root.plugin.position = value
                 }
             }
         }
@@ -43,9 +47,9 @@ Loader {
     Component {
         id: progressBar
 
-        ProgressBar {
+        CachyProgressBar {
             from: 0
-            to: plugin.length
+            to: root.plugin.length
         }
     }
 
@@ -53,8 +57,12 @@ Loader {
         id: positionUpdateTimer
         interval: 1000
         repeat: true
-        running: updatePositionSlider && plugin.isPlaying
+        running: root.updatePositionSlider && root.plugin.isPlaying
 
-        onTriggered: item.value = lastPosition + (new Date().getTime() - lastPositionTime.getTime())
+        onTriggered: {
+            if (root.item) {
+                root.item.value = root.lastPosition + (new Date().getTime() - root.lastPositionTime.getTime())
+            }
+        }
     }
 }

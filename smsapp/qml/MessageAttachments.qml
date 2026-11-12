@@ -2,13 +2,15 @@
  * SPDX-FileCopyrightText: 2020 Aniket Kumar <anikketkumar786@gmail.com>
  *
  * SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
+ *
+ * Message attachment item of the KDE Connect SMS application, migrated to the
+ * CachyOS.UI design system (Golden Gate / Liquid Glass).
  */
 
 import QtQuick
 import QtQuick.Layouts
-import QtQuick.Controls
-import org.kde.kirigami as Kirigami
 import QtMultimedia
+import CachyOS.UI
 
 Item {
     id: root
@@ -16,6 +18,8 @@ Item {
     property string mimeType
     property string uniqueIdentifier
     property url source
+    property var conversationModel: null
+    property var pageStack: null
 
     readonly property int elementWidth: 100
     readonly property int elementHeight: 100
@@ -29,40 +33,51 @@ Item {
         AttachmentViewer {
             fileUrl: root.source
             mimeType: root.mimeType
-            title: uniqueIdentifier
+            title: root.uniqueIdentifier
+            pageStack: root.pageStack
         }
     }
 
-    Kirigami.ShadowedImage {
+    Rectangle {
         id: thumbnailElement
-        visible: mimeType.match("image") || mimeType.match("video")
-        source: visible ? "image://thumbnailsProvider/" + root.uniqueIdentifier : ""
-
+        visible: root.mimeType.match("image") || root.mimeType.match("video")
         radius: 6
+        color: CachyTheme.cardBackground
+        clip: true
+        width: visible && thumbImg.sourceSize.width > 0 ? thumbImg.sourceSize.width : root.elementWidth
+        height: visible && thumbImg.sourceSize.height > 0 ? thumbImg.sourceSize.height : root.elementHeight
 
-        width: visible ? sourceSize.width : elementWidth
-        height: visible ? sourceSize.height : elementHeight
+        Image {
+            id: thumbImg
+            anchors.fill: parent
+            source: parent.visible ? "image://thumbnailsProvider/" + root.uniqueIdentifier : ""
+            fillMode: Image.PreserveAspectFit
+        }
 
         MouseArea {
             anchors.fill: parent
             onClicked: {
                 if (root.source.toString() === "") {
-                    conversationModel.requestAttachmentPath(root.partID, root.uniqueIdentifier)
+                    if (root.conversationModel) {
+                        root.conversationModel.requestAttachmentPath(root.partID, root.uniqueIdentifier)
+                    }
                 } else {
-                    openMedia();
+                    root.openMedia();
                 }
             }
         }
 
-        Button {
-            icon.name: "media-playback-start"
-            visible: root.mimeType.match("video")
+        CachyToolbarButton {
+            iconName: "media-playback-start"
+            visible: Boolean(root.mimeType.match("video"))
             anchors.centerIn: parent
             onClicked: {
                 if (root.source.toString() === "") {
-                    conversationModel.requestAttachmentPath(root.partID, root.uniqueIdentifier)
+                    if (root.conversationModel) {
+                        root.conversationModel.requestAttachmentPath(root.partID, root.uniqueIdentifier)
+                    }
                 } else {
-                    openMedia();
+                    root.openMedia();
                 }
             }
         }
@@ -70,10 +85,12 @@ Item {
 
     Rectangle {
         id: audioElement
-        visible: root.mimeType.match("audio")
+        visible: Boolean(root.mimeType.match("audio"))
         anchors.fill: parent
-        radius: messageBox.radius
-        color: "lightgrey"
+        radius: CachyTheme.radiusSmall
+        color: CachyTheme.cardBackground
+        border.width: 1
+        border.color: CachyTheme.specularBorder
 
         MediaPlayer {
             id: audioPlayer
@@ -81,43 +98,45 @@ Item {
 
             onPlaybackStateChanged: {
                 if (playbackState === MediaPlayer.PlayingState) {
-                    audioPlayButton.icon.name = "media-playback-stop"
+                    audioPlayButton.iconName = "media-playback-stop"
                 } else {
-                    audioPlayButton.icon.name = "media-playback-start"
+                    audioPlayButton.iconName = "media-playback-start"
                 }
             }
         }
 
         ColumnLayout {
             anchors.centerIn: parent
-            spacing: Kirigami.Units.largeSpacing
+            spacing: CachyTheme.spacingSmall
 
-            Button {
+            CachyToolbarButton {
                 id: audioPlayButton
-                icon.name: "media-playback-start"
+                iconName: "media-playback-start"
                 Layout.alignment: Qt.AlignCenter
 
                 onClicked: {
                     if (root.source.toString() !== "") {
-                        if (icon.name === "media-playback-start") {
+                        if (iconName === "media-playback-start") {
                             audioPlayer.play()
                         } else {
                             audioPlayer.stop()
                         }
-                    } else {
-                        conversationModel.requestAttachmentPath(root.partID, root.uniqueIdentifier)
+                    } else if (root.conversationModel) {
+                        root.conversationModel.requestAttachmentPath(root.partID, root.uniqueIdentifier)
                     }
                 }
             }
 
-            Label {
+            Text {
                 text: i18nd("kdeconnect-sms", "Audio clip")
+                font.pixelSize: 11
+                color: CachyTheme.textSecondary
             }
         }
     }
 
     Connections {
-        target: conversationModel
+        target: root.conversationModel
         function onFilePathReceived(filePath, fileName) {
             if (root.uniqueIdentifier === fileName && root.source.toString() === "") {
                 root.source = "file://" + filePath
@@ -126,13 +145,15 @@ Item {
                     audioPlayer.source = root.source
                     audioPlayer.play()
                 } else if (root.mimeType.match("image") || root.mimeType.match("video")) {
-                    openMedia();
+                    root.openMedia();
                 }
             }
         }
     }
 
     function openMedia() {
-        applicationWindow().pageStack.layers.push(attachmentViewer)
+        if (root.pageStack) {
+            root.pageStack.layers.push(attachmentViewer, {})
+        }
     }
 }

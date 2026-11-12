@@ -6,11 +6,14 @@
 
 #include <QApplication>
 #include <QCommandLineParser>
+#include <QDir>
 #include <QIcon>
 #include <QProcess>
 #include <QQmlApplicationEngine>
 #include <QQuickStyle>
+#include <QQuickWindow>
 #include <QStandardPaths>
+#include <QTimer>
 #include <QWindow>
 
 #include "kdeconnect-version.h"
@@ -77,6 +80,7 @@ int main(int argc, char *argv[])
 
     QString device;
     QString config;
+    QString screenshotPath;
     bool replace = false;
     {
         QCommandLineParser parser;
@@ -89,6 +93,10 @@ int main(int argc, char *argv[])
 
         QCommandLineOption replaceOption({QStringLiteral("replace")}, i18nc("command line description", "Replace an existing instance"));
         parser.addOption(replaceOption);
+        QCommandLineOption screenshotOption(QStringLiteral("screenshot"),
+                                            i18nc("command line description", "Capture a window screenshot and exit"),
+                                            QStringLiteral("path"));
+        parser.addOption(screenshotOption);
 
         parser.addPositionalArgument(QStringLiteral("url"), i18n("URL to share"));
         aboutData.setupCommandLine(&parser);
@@ -111,6 +119,9 @@ int main(int argc, char *argv[])
         if (parser.isSet(configOption)) {
             config = parser.value(configOption);
         }
+        if (parser.isSet(screenshotOption)) {
+            screenshotPath = parser.value(screenshotOption);
+        }
     }
 
     KDBusService::StartupOptions flags = KDBusService::Unique;
@@ -120,6 +131,9 @@ int main(int argc, char *argv[])
     KDBusService dbusService(flags);
     QQmlApplicationEngine engine;
     KLocalization::setupLocalizedContext(&engine);
+    // The CachyOS.UI design system (Liquid Glass) lives in the user prefix
+    // until it is packaged system wide.
+    engine.addImportPath(QDir::homePath() + QStringLiteral("/.local/lib/qt6/qml"));
     engine.loadFromModule("org.kde.kdeconnect.app", "Main");
 
     if (engine.rootObjects().isEmpty()) {
@@ -127,6 +141,15 @@ int main(int argc, char *argv[])
         return 1;
     }
     auto obj = qobject_cast<QWindow *>(engine.rootObjects().constFirst());
+
+    if (!screenshotPath.isEmpty()) {
+        QTimer::singleShot(600, obj, [obj, screenshotPath, &app]() {
+            if (auto *quickWindow = qobject_cast<QQuickWindow *>(obj)) {
+                quickWindow->grabWindow().save(screenshotPath);
+            }
+            app.quit();
+        });
+    }
     if (!device.isEmpty()) {
         auto mo = obj->metaObject();
         mo->invokeMethod(obj, "openDevice", Qt::QueuedConnection, Q_ARG(QVariant, device), Q_ARG(QVariant, config));

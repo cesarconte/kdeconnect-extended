@@ -2,72 +2,73 @@
  * SPDX-FileCopyrightText: 2024 Darshan Phaldesai <dev.darshanphaldesai@gmail.org>
  *
  * SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
+ *
+ * Welcome page of the KDE Connect application, migrated to the CachyOS.UI
+ * design system (Golden Gate / Liquid Glass).
  */
 
 import QtQuick
-import QtQuick.Controls as Controls
 import QtQuick.Layouts
-import org.kde.kirigami as Kirigami
-import org.kde.kirigamiaddons.formcard as FormCard
+import CachyOS.UI
 
-FormCard.FormCardPage {
+CachyFormCardPage {
     id: root
 
-
-    Kirigami.Icon {
-        source: "kdeconnect"
-        implicitWidth: Kirigami.Units.iconSizes.huge
-        implicitHeight: Kirigami.Units.iconSizes.huge
-
+    Image {
+        // The icon of the application is installed by its own package; when it
+        // is not available a generic one is shown instead of a hole.
+        source: CachyTheme.iconUrl("kdeconnect", "network-connect-symbolic")
         Layout.alignment: Qt.AlignHCenter
-        Layout.topMargin: Kirigami.Units.gridUnit
+        Layout.preferredWidth: 96
+        Layout.preferredHeight: 96
+        Layout.topMargin: CachyTheme.spacingLarge
+        fillMode: Image.PreserveAspectFit
+        smooth: true
     }
 
-    Kirigami.Heading {
+    CachyHeading {
         text: i18nc("@title", "No Device Selected")
-        horizontalAlignment: Qt.AlignHCenter
-
+        horizontalAlignment: Text.AlignHCenter
         Layout.fillWidth: true
-        Layout.topMargin: Kirigami.Units.largeSpacing
+        Layout.minimumWidth: 0
+        Layout.topMargin: CachyTheme.spacingLarge
+        level: 2
     }
 
-    Controls.Label {
+    Text {
         text: i18nc("@info", "Make sure to install KDE Connect on your other devices.")
-        horizontalAlignment: Qt.AlignHCenter
+        horizontalAlignment: Text.AlignHCenter
         wrapMode: Text.WordWrap
-
         Layout.fillWidth: true
-        Layout.topMargin: Kirigami.Units.largeSpacing
+        Layout.minimumWidth: 0
+        Layout.topMargin: CachyTheme.spacingMedium
+        font.pixelSize: 12
+        color: CachyTheme.textSecondary
     }
 
-    FormCard.FormHeader {
-        title: i18nc("@title:context", "KDE Connect Android App")
-
-        Layout.topMargin: Kirigami.Units.gridUnit
+    CachyFormHeader {
+        title: i18nc("@title:context", "KDE Connect for Android")
+        Layout.fillWidth: true
+        Layout.leftMargin: CachyTheme.marginWindow
+        Layout.rightMargin: CachyTheme.marginWindow
+        Layout.topMargin: CachyTheme.spacingLarge
     }
 
-    FormCard.FormCard {
-        FormCard.FormButtonDelegate {
+    CachyFormCard {
+        Layout.fillWidth: true
+        Layout.leftMargin: CachyTheme.marginWindow
+        Layout.rightMargin: CachyTheme.marginWindow
+
+        CachyFormButtonDelegate {
             text: i18nc("Android Application Store", "F-Droid")
             onClicked: Qt.openUrlExternally("https://f-droid.org/repository/browse/?fdid=org.kde.kdeconnect_tp")
         }
 
-        FormCard.FormDelegateSeparator {}
+        CachyFormDelegateSeparator {}
 
-        FormCard.FormButtonDelegate {
-            text: i18nc("Android Application Store", "Play Store")
+        CachyFormButtonDelegate {
+            text: i18nc("Android Application Store", "Google Play")
             onClicked: Qt.openUrlExternally("https://play.google.com/store/apps/details?id=org.kde.kdeconnect_tp")
-        }
-    }
-
-    FormCard.FormHeader {
-        title: i18nc("@title:context", "KDE Connect iOS App")
-    }
-
-    FormCard.FormCard {
-        FormCard.FormButtonDelegate {
-            text: i18n("App Store")
-            onClicked: Qt.openUrlExternally("https://apps.apple.com/us/app/kde-connect/id1580245991")
         }
     }
 }

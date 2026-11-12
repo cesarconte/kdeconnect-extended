@@ -4,161 +4,117 @@
  * SPDX-FileCopyrightText: 2018 Simon Redman <simon@ergotech.com>
  *
  * SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
+ *
+ * Conversation list page of the KDE Connect SMS application, migrated to the
+ * CachyOS.UI design system (Golden Gate / Liquid Glass).
  */
 
 import QtQuick
-import QtQuick.Controls
+import QtQuick.Controls as QQC2
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
-import org.kde.kirigami.delegates as KirigamiDelegates
-import org.kde.kirigami.platform as KirigamiPlatform
 import org.kde.kdeconnect.sms
+import CachyOS.UI
 
-Kirigami.ScrollablePage
-{
+CachyScrollablePage {
     id: page
 
-    ToolTip {
-        visible: !deviceConnected
-        timeout: -1
-        text: "⚠️ " + i18nd("kdeconnect-sms", "No devices available") + " ⚠️"
-
-        MouseArea {
-            // Detect mouseover and show another tooltip with more information
-            anchors.fill: parent
-            hoverEnabled: true
-
-            ToolTip.visible: containsMouse
-            ToolTip.delay: Qt.styleHints.mousePressAndHoldInterval
-            ToolTip.text: i18nd("kdeconnect-sms", "No new messages can be sent or received, but you can browse cached content")
-        }
-    }
-
-    ColumnLayout {
-        id: loadingMessage
-        visible: deviceConnected && view.count === 0 && currentSearchText.length == 0
-        anchors.centerIn: parent
-
-        BusyIndicator {
-            visible: loadingMessage.visible
-            running: loadingMessage.visible
-            Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
-        }
-
-        Label {
-            text: i18nd("kdeconnect-sms", "Loading conversations from device. If this takes a long time, please wake up your device and then click Refresh.")
-            Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
-            Layout.preferredWidth: page.width / 2
-            horizontalAlignment: Text.AlignHCenter
-            wrapMode: Text.Wrap
-        }
-
-        Label {
-            text: i18nd("kdeconnect-sms", "Tip: If you plug in your device, it should not go into doze mode and should load quickly.")
-            Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
-            Layout.preferredWidth: page.width / 2
-            horizontalAlignment: Text.AlignHCenter
-            wrapMode: Text.Wrap
-        }
-
-        Button {
-            text: i18nd("kdeconnect-sms", "Refresh")
-            icon.name: "view-refresh"
-            Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
-            onClicked: {
-                conversationListModel.refresh();
-            }
-        }
-    }
-
-    property string initialMessage : AppData.initialMessage
+    property string initialMessage: AppData.initialMessage
     property string currentSearchText
     property alias conversationListModel: conversationListModel
-    property int devicesCount
+    property int devicesCount: 0
     readonly property bool deviceConnected: devicesCount > 0
 
-    header: Kirigami.InlineMessage {
-        Layout.fillWidth: true
-        position: Kirigami.InlineMessage.Header
-        visible: page.initialMessage.length > 0
-        text: i18nd("kdeconnect-sms", "Choose recipient")
+    header: Item {
+        implicitHeight: headerColumn.implicitHeight
 
-        actions: [
-          Kirigami.Action {
-              icon.name: "dialog-cancel"
-              text: i18nd("kdeconnect-sms", "Cancel")
-              onTriggered: initialMessage = ""
-            }
-        ]
-    }
+        ColumnLayout {
+            id: headerColumn
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            spacing: CachyTheme.spacingSmall
 
-    titleDelegate: RowLayout {
-        spacing: Kirigami.Units.mediumSpacing
+            RowLayout {
+                Layout.fillWidth: true
+                visible: page.initialMessage.length > 0
+                spacing: CachyTheme.spacingSmall
 
-        Layout.fillWidth: true
-
-        Keys.forwardTo: [filter]
-
-        Kirigami.SearchField {
-            /**
-             * Used as the filter of the list of messages
-             */
-            id: filter
-            Layout.fillWidth: true
-            placeholderText: i18nd("kdeconnect-sms", "Search or start a conversation")
-            enabled: deviceConnected
-            onTextChanged: {
-                currentSearchText = filter.text;
-                if (filter.text !== "") {
-                    view.model.setConversationsFilterRole(ConversationListModel.AddressesRole)
-                } else {
-                    view.model.setConversationsFilterRole(ConversationListModel.ConversationIdRole)
+                CachyInlineMessage {
+                    Layout.fillWidth: true
+                    text: i18nd("kdeconnect-sms", "Choose recipient")
                 }
-                view.model.setFilterFixedString(SmsHelper.canonicalizePhoneNumber(filter.text))
 
-                view.currentIndex = 0
-                filter.forceActiveFocus();
-            }
-
-            Keys.onReturnPressed: event => {
-                event.accepted = true
-                view.currentItem.startChat()
-            }
-            Keys.onEscapePressed: event => {
-                event.accepted = filter.text !== ""
-                filter.text = ""
-            }
-            Shortcut {
-                sequence: "Ctrl+F"
-                onActivated: filter.forceActiveFocus()
-            }
-        }
-
-        Button {
-            id: newButton
-            icon.name: "list-add"
-            enabled: SmsHelper.isAddressValid(filter.text) && deviceConnected
-
-            ToolTip.visible: hovered
-            ToolTip.delay: Qt.styleHints.mousePressAndHoldInterval
-            ToolTip.text: i18nd("kdeconnect-sms", "Start new conversation")
-
-            onClicked: {
-                // We have to disable the filter temporarily in order to avoid getting key inputs accidentally while processing the request
-                filter.enabled = false
-
-                // If the address entered by the user already exists then ignore adding new contact
-                if (!view.model.doesAddressExists(filter.text) && SmsHelper.isAddressValid(filter.text)) {
-                    conversationListModel.createConversationForAddress(filter.text)
-                    view.currentIndex = 0
+                CachyButton {
+                    text: i18nd("kdeconnect-sms", "Cancel")
+                    onClicked: page.initialMessage = ""
                 }
-                view.currentItem.startChat()
-                filter.enabled = true
             }
 
-            Shortcut {
-                sequence: "Ctrl+N"
-                onActivated: newButton.clicked()
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: CachyTheme.spacingSmall
+
+                Keys.forwardTo: [filter]
+
+                CachySearchField {
+                    id: filter
+                    Layout.fillWidth: true
+                    placeholderText: i18nd("kdeconnect-sms", "Search or start a conversation")
+                    enabled: page.deviceConnected
+                    onTextChanged: {
+                        page.currentSearchText = filter.text;
+                        if (filter.text !== "") {
+                            view.model.setConversationsFilterRole(ConversationListModel.AddressesRole)
+                        } else {
+                            view.model.setConversationsFilterRole(ConversationListModel.ConversationIdRole)
+                        }
+                        view.model.setFilterFixedString(SmsHelper.canonicalizePhoneNumber(filter.text))
+
+                        view.currentIndex = 0
+                        filter.forceActiveFocus();
+                    }
+
+                    Keys.onReturnPressed: event => {
+                        event.accepted = true
+                        if (view.currentItem) {
+                            view.currentItem.startChat()
+                        }
+                    }
+                    Keys.onEscapePressed: event => {
+                        event.accepted = filter.text !== ""
+                        filter.text = ""
+                    }
+                    Shortcut {
+                        sequence: "Ctrl+F"
+                        onActivated: filter.forceActiveFocus()
+                    }
+                }
+
+                CachyToolbarButton {
+                    id: newButton
+                    iconName: "list-add-symbolic"
+                    enabled: SmsHelper.isAddressValid(filter.text) && page.deviceConnected
+                    tooltipText: i18nd("kdeconnect-sms", "Start new conversation")
+
+                    onClicked: {
+                        filter.enabled = false
+
+                        if (!view.model.doesAddressExists(filter.text) && SmsHelper.isAddressValid(filter.text)) {
+                            conversationListModel.createConversationForAddress(filter.text)
+                            view.currentIndex = 0
+                        }
+                        if (view.currentItem) {
+                            view.currentItem.startChat()
+                        }
+                        filter.enabled = true
+                    }
+
+                    Shortcut {
+                        sequence: "Ctrl+N"
+                        onActivated: newButton.clicked()
+                    }
+                }
             }
         }
     }
@@ -167,6 +123,7 @@ Kirigami.ScrollablePage
         id: chatView
         ConversationDisplay {
             deviceConnected: page.deviceConnected
+            pageStack: page.pageStack
         }
     }
 
@@ -186,30 +143,11 @@ Kirigami.ScrollablePage
             focus = true
         }
 
-        Kirigami.PlaceholderMessage {
-            anchors.centerIn: parent
-            width: parent.width - (Kirigami.Units.largeSpacing * 4)
-            visible: deviceConnected && view.count === 0 && currentSearchText.length !== 0
-            icon.name: "search"
-            text: i18ndc("kdeconnect-sms", "Placeholder message text when no messages are found", "No Matches")
-        }
-
-        Kirigami.PlaceholderMessage {
-            anchors.centerIn: parent
-            width: parent.width - (Kirigami.Units.largeSpacing * 4)
-
-            visible: view.count === 0 && currentSearchText.length === 0
-
-            icon.name: "view-conversation-balloon"
-            text: i18ndc("kdeconnect-sms", "@info:placeholder", "No Conversations")
-        }
-
-        Keys.forwardTo: [headerItem]
-
-        delegate: ItemDelegate {
+        delegate: QQC2.ItemDelegate {
             id: listItem
             text: displayNames
             width: view.width
+            height: 56
 
             required property string displayNames
             required property string toolTip
@@ -220,17 +158,22 @@ Kirigami.ScrollablePage
             required property bool isMultitarget
             required property int conversationId
 
-            // Keep the currently-open chat highlighted even if this element is not focused
             highlighted: ListView.isCurrentItem
 
             function startChat() {
-                view.currentItem.forceActiveFocus();
-                applicationWindow().pageStack.push(chatView, {
-                                                       addresses: listItem.addresses,
-                                                       conversationId: listItem.conversationId,
-                                                       isMultitarget: listItem.isMultitarget,
-                                                       initialMessage: page.initialMessage})
-                initialMessage = ""
+                if (view.currentItem) {
+                    view.currentItem.forceActiveFocus();
+                }
+                if (page.pageStack) {
+                    page.pageStack.push(chatView, {
+                        addresses: listItem.addresses,
+                        conversationId: listItem.conversationId,
+                        isMultitarget: listItem.isMultitarget,
+                        initialMessage: page.initialMessage,
+                        pageStack: page.pageStack
+                    })
+                }
+                page.initialMessage = ""
             }
 
             onClicked: {
@@ -238,34 +181,104 @@ Kirigami.ScrollablePage
                 startChat();
             }
 
-            // Note: Width calcs to account for scrollbar coming and going
+            background: Rectangle {
+                radius: CachyTheme.radiusSmall
+                color: listItem.highlighted
+                    ? CachyTheme.withAlpha(CachyTheme.accentColor, 0.16)
+                    : (listItem.hovered ? CachyTheme.cardBackgroundHover : "transparent")
+            }
+
             contentItem: RowLayout {
                 id: contentRow
-                spacing: Kirigami.Units.smallSpacing
-                implicitWidth: view.width - Kirigami.Units.largeSpacing
+                spacing: CachyTheme.spacingSmall
 
                 Kirigami.Icon {
                     id: contactIcon
                     source: listItem.decoration
+                    Layout.preferredWidth: 28
+                    Layout.preferredHeight: 28
                 }
 
-                // Set width here to force elide and account for scrollbar
-                KirigamiDelegates.TitleSubtitle {
-                    title: listItem.text
-                    subtitle: listItem.toolTip
-                    elide: Text.ElideRight
+                ColumnLayout {
                     Layout.fillWidth: true
+                    Layout.minimumWidth: 0
+                    spacing: 0
+
+                    Text {
+                        Layout.fillWidth: true
+                        Layout.minimumWidth: 0
+                        text: listItem.text
+                        elide: Text.ElideRight
+                        font.pixelSize: 13
+                        font.weight: listItem.highlighted ? Font.Bold : Font.DemiBold
+                        color: listItem.highlighted ? CachyTheme.accentColor : CachyTheme.textPrimary
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        Layout.minimumWidth: 0
+                        visible: listItem.toolTip.length > 0
+                        text: listItem.toolTip
+                        elide: Text.ElideRight
+                        font.pixelSize: 11
+                        color: CachyTheme.textMuted
+                    }
                 }
 
-                Kirigami.ShadowedImage {
-                    id: thumbnailItem
-                    source: listItem.attachmentPreview === undefined ? "" : `image://thumbnailsProvider/${listItem.attachmentPreview}`
+                Rectangle {
+                    id: thumbnailFrame
                     visible: listItem.attachmentPreview !== undefined
-                    width: KirigamiPlatform.Units.iconSizes.medium
-                    height: KirigamiPlatform.Units.iconSizes.medium
-                    radius: thumbnailItem.width / 6
+                    Layout.preferredWidth: 32
+                    Layout.preferredHeight: 32
+                    radius: 6
+                    color: CachyTheme.cardBackground
+                    clip: true
+
+                    Image {
+                        anchors.fill: parent
+                        source: listItem.attachmentPreview === undefined ? "" : `image://thumbnailsProvider/${listItem.attachmentPreview}`
+                        fillMode: Image.PreserveAspectCrop
+                    }
                 }
             }
+        }
+    }
+
+    // =========================================================================
+    // Estados vacíos / cargando
+    // =========================================================================
+    CachyPlaceholderMessage {
+        parent: page
+        anchors.centerIn: parent
+        width: page.width - (CachyTheme.marginWindow * 2)
+        visible: page.deviceConnected && view.count === 0 && page.currentSearchText.length !== 0
+        iconName: "search"
+        text: i18ndc("kdeconnect-sms", "Placeholder message text when no messages are found", "No Matches")
+    }
+
+    CachyPlaceholderMessage {
+        parent: page
+        anchors.centerIn: parent
+        width: page.width - (CachyTheme.marginWindow * 2)
+        visible: !page.deviceConnected && view.count === 0 && page.currentSearchText.length === 0
+        iconName: "view-conversation-balloon"
+        text: i18ndc("kdeconnect-sms", "@info:placeholder", "No Conversations")
+    }
+
+    CachyPlaceholderMessage {
+        parent: page
+        anchors.centerIn: parent
+        width: page.width - (CachyTheme.marginWindow * 2)
+        visible: page.deviceConnected && view.count === 0 && page.currentSearchText.length === 0
+        iconName: "view-conversation-balloon"
+        text: i18nd("kdeconnect-sms", "Loading conversations from device. If this takes a long time, please wake up your device and then click Refresh.")
+        helpfulAction: ({
+            text: i18nd("kdeconnect-sms", "Refresh"),
+            onTriggered: () => conversationListModel.refresh()
+        })
+
+        QQC2.BusyIndicator {
+            running: parent.visible
         }
     }
 }
