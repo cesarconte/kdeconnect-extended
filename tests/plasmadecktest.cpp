@@ -92,7 +92,7 @@ private Q_SLOTS:
             QVERIFY(client.waitForConnected(2000));
             QTest::qWait(50);
 
-            client.write("GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
+            client.write("GET /api/events HTTP/1.1\r\nHost: localhost\r\n\r\n");
             client.flush();
             QTest::qWait(50);
 

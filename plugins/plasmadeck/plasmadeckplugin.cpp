@@ -341,7 +341,14 @@ void PlasmaDeckPlugin::handleAction(const QString &actionId, const QString &cmd,
     } else if (actionId == QLatin1String("screenshot")) {
         QProcess::startDetached(QStringLiteral("spectacle"), {QStringLiteral("-r")});
     } else if (actionId == QLatin1String("ocr")) {
-        QProcess::startDetached(QStringLiteral("/home/cesar/.local/bin/kocr"), {});
+        QString ocrBin = QStandardPaths::findExecutable(QStringLiteral("klivetext"));
+        if (ocrBin.isEmpty()) {
+            ocrBin = QStandardPaths::findExecutable(QStringLiteral("kocr"));
+        }
+        if (ocrBin.isEmpty()) {
+            ocrBin = QStringLiteral("/home/cesar/.local/bin/kocr");
+        }
+        QProcess::startDetached(ocrBin, {});
     } else if (actionId == QLatin1String("lock")) {
         QProcess::startDetached(QStringLiteral("loginctl"), {QStringLiteral("lock-session")});
     } else if (actionId == QLatin1String("night_color")) {
